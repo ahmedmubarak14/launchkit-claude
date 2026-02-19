@@ -112,24 +112,54 @@ export async function POST(request: NextRequest) {
       console.log("[products] Missing store credentials — store_id:", store?.store_id, "access_token:", !!store?.access_token);
     }
 
-    // ─── Save to Supabase ────────────────────────────────────────────────────────
-    const { data, error } = await supabase.from("products").insert({
-      session_id: sessionId,
-      name_ar: product.nameAr,
-      name_en: product.nameEn,
-      description_ar: product.descriptionAr ?? null,
-      description_en: product.descriptionEn ?? null,
-      price: product.price || 0,
-      variants: product.variants || [],
-      platform_id: zidProductId,
-    }).select().single();
+    // ─── Save to Supabase (best-effort — don't let DB failure block Zid push) ────
+    let dbProduct = null;
+    try {
+      const { data: inserted, error: dbError } = await supabase.from("products").insert({
+        session_id: sessionId,
+        name_ar: product.nameAr || product.nameEn || "Product",
+        name_en: product.nameEn || product.nameAr || "Product",
+        description_ar: product.descriptionAr ?? null,
+        description_en: product.descriptionEn ?? null,
+        price: product.price || 0,
+        variants: product.variants || [],
+        platform_id: zidProductId,
+      }).select().single();
 
-    if (error) throw error;
+      if (dbError) {
+        console.error("[products] Supabase insert error (non-fatal):", dbError.message, dbError.code);
+        // If FK violation (session not found), try without session_id constraint
+        if (dbError.code === "23503") {
+          console.log("[products] FK violation — session_id not found, skipping DB insert");
+        }
+      } else {
+        dbProduct = inserted;
+      }
+    } catch (dbErr) {
+      console.error("[products] DB insert exception (non-fatal):", dbErr);
+    }
 
-    return NextResponse.json({ success: true, product: data, pushedToZid: !!zidProductId });
+    // Return success if we pushed to Zid OR saved to DB
+    if (zidProductId || dbProduct) {
+      return NextResponse.json({
+        success: true,
+        product: dbProduct || { ...product, platform_id: zidProductId },
+        pushedToZid: !!zidProductId,
+        savedToDb: !!dbProduct,
+      });
+    }
+
+    // Neither worked
+    return NextResponse.json({
+      error: store?.store_id
+        ? "Failed to create product — check Zid API credentials"
+        : "Store not connected (missing store_id). Visit /api/store/fix-store-id first.",
+      pushedToZid: false,
+      savedToDb: false,
+    }, { status: 500 });
   } catch (error) {
     console.error("[products] API error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: String(error) }, { status: 500 });
   }
 }
 

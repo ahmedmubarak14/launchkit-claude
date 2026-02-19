@@ -18,6 +18,7 @@ interface ProductCardProps {
 export function ProductCard({ action, sessionId, language, onConfirm }: ProductCardProps) {
   const [confirmed, setConfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [zidCategories, setZidCategories] = useState<ZidCat[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
   const data = action.data;
@@ -46,6 +47,7 @@ export function ProductCard({ action, sessionId, language, onConfirm }: ProductC
 
   const handleConfirm = async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch("/api/store/products", {
         method: "POST",
@@ -58,11 +60,19 @@ export function ProductCard({ action, sessionId, language, onConfirm }: ProductC
           sessionId,
         }),
       });
-      if (res.ok) {
-        const result = await res.json();
+      const result = await res.json();
+      if (res.ok && result.success) {
         setConfirmed(true);
         onConfirm(result.product || data);
+      } else {
+        // Show error so user knows what happened
+        const msg = result.error || (language === "en" ? "Failed to add product" : "فشل إضافة المنتج");
+        setError(msg);
+        console.error("[ProductCard] product API error:", result);
       }
+    } catch (err) {
+      setError(language === "en" ? "Network error — please try again" : "خطأ في الشبكة — حاول مجددًا");
+      console.error("[ProductCard] fetch error:", err);
     } finally {
       setLoading(false);
     }
@@ -207,6 +217,13 @@ export function ProductCard({ action, sessionId, language, onConfirm }: ProductC
             <div className="text-xs font-semibold text-gray-700 truncate">{data?.nameEn}</div>
           </div>
         </div>
+
+        {/* Error message */}
+        {error && (
+          <div className="mt-3 px-3 py-2 bg-red-50 border border-red-200 rounded-xl">
+            <p className="text-xs text-red-600 font-medium" dir={isRTL ? "rtl" : "ltr"}>{error}</p>
+          </div>
+        )}
 
         {/* Action buttons */}
         <div className="flex gap-2 mt-4">
