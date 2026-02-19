@@ -11,27 +11,66 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    
+
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Save categories to Supabase
+    // Get user's Zid store access token
+    const { data: store } = await supabase
+      .from("stores")
+      .select("access_token, store_id")
+      .eq("user_id", user.id)
+      .eq("platform", "zid")
+      .single();
+
+    // Push each category to Zid if store is connected
+    const zidResults: Record<string, string> = {};
+    if (store?.access_token) {
+      for (const cat of categories) {
+        try {
+          const zidRes = await fetch(`${process.env.ZID_API_BASE_URL}/v1/managers/store/category`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${store.access_token}`,
+              "Content-Type": "application/json",
+              "Accept-Language": "ar",
+            },
+            body: JSON.stringify({
+              name: { ar: cat.nameAr, en: cat.nameEn },
+              description: { ar: "", en: "" },
+              active: true,
+            }),
+          });
+
+          if (zidRes.ok) {
+            const zidData = await zidRes.json();
+            const zidId = zidData?.category?.id?.toString() || zidData?.id?.toString();
+            if (zidId) zidResults[cat.nameEn] = zidId;
+          } else {
+            const errText = await zidRes.text();
+            console.error(`Zid category create failed for "${cat.nameEn}":`, zidRes.status, errText);
+          }
+        } catch (err) {
+          console.error(`Zid category push error for "${cat.nameEn}":`, err);
+        }
+      }
+    }
+
+    // Save categories to Supabase with Zid platform_id if available
     const { data, error } = await supabase.from("categories").insert(
       categories.map((cat: { nameAr: string; nameEn: string }) => ({
         session_id: sessionId,
         name_ar: cat.nameAr,
         name_en: cat.nameEn,
+        platform_id: zidResults[cat.nameEn] || null,
       }))
     ).select();
 
     if (error) throw error;
 
-    // TODO: Also push to Zid API when credentials are configured
-    // const store = await getStoreForSession(sessionId);
-    // await pushCategoriesToZid(store, categories);
-
-    return NextResponse.json({ success: true, categories: data });
+    const pushedToZid = Object.keys(zidResults).length > 0;
+    return NextResponse.json({ success: true, categories: data, pushedToZid });
   } catch (error) {
     console.error("Categories API error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -49,7 +88,7 @@ export async function GET(request: NextRequest) {
 
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    
+
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

@@ -10,7 +10,7 @@ const SYSTEM_PROMPT = `You are LaunchKit AI, an expert e-commerce store setup as
 
 RULES:
 1. Detect user's language (Arabic or English) and ALWAYS respond in the SAME language
-2. Be concise and helpful - max 3-4 sentences per response  
+2. Be concise and helpful - max 3-4 sentences per response
 3. Always suggest the next logical step
 4. For store content, generate BOTH Arabic and English versions
 5. Always confirm with the user before saying you'll create anything
@@ -44,7 +44,7 @@ When suggesting categories, use:
 
 When previewing a product, use:
 {
-  "type": "preview_product", 
+  "type": "preview_product",
   "data": {
     "nameAr": "اسم المنتج",
     "nameEn": "Product Name",
@@ -65,14 +65,14 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    
+
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Build message history for context
     const messages: Anthropic.MessageParam[] = [];
-    
+
     if (history && Array.isArray(history)) {
       for (const msg of history.slice(-10)) { // last 10 messages for context
         messages.push({
@@ -85,14 +85,14 @@ export async function POST(request: NextRequest) {
     messages.push({ role: "user", content: message });
 
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-sonnet-4-5",
       max_tokens: 1024,
       system: SYSTEM_PROMPT,
       messages,
     });
 
     const rawContent = response.content[0].type === "text" ? response.content[0].text : "";
-    
+
     let parsed;
     try {
       // Extract JSON from response (handle cases where model adds text before/after)
