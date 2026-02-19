@@ -68,6 +68,15 @@ export interface ProductVariant {
   options: string[];
 }
 
+// ─── Zid Live Category (fetched from merchant's store) ────────────────────────
+export interface ZidCategory {
+  id: string;
+  nameAr: string;
+  nameEn: string;
+  slug: string | null;
+  productsCount: number;
+}
+
 // ─── New: Theme ────────────────────────────────────────────────────────────────
 export interface StoreTheme {
   id: string;
@@ -127,6 +136,8 @@ export interface AIAction {
     logoPrompt?: string;
     // Bulk products
     products?: BulkProductItem[];
+    // Existing Zid categories (for smart category review mode)
+    existingCategories?: ZidCategory[];
   };
 }
 

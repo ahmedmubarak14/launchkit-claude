@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useAppStore } from "@/store/useStore";
-import { ChatMessage, AIAction, StoreTheme, BulkProductItem } from "@/types";
+import { ChatMessage, AIAction, StoreTheme, BulkProductItem, ZidCategory } from "@/types";
 import { MessageBubble, TypingIndicator } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
 
@@ -13,11 +13,6 @@ interface ChatContainerProps {
 function generateId() {
   return Math.random().toString(36).slice(2);
 }
-
-const WELCOME_MESSAGES: Record<string, string> = {
-  en: "Hello! I'm your LaunchKit AI assistant. I'm here to help you set up your online store step by step. To get started — what type of products do you sell? Tell me about your business!",
-  ar: "مرحباً! أنا مساعد لاينش كيت الذكي. أنا هنا لمساعدتك في إعداد متجرك الإلكتروني خطوة بخطوة. للبدء — ما نوع المنتجات التي تبيعها؟ أخبرني عن نشاطك التجاري!",
-};
 
 export function ChatContainer({ sessionId }: ChatContainerProps) {
   const {
@@ -40,6 +35,10 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isInitialized = useRef(false);
 
+  // Live Zid categories fetched on mount
+  const [zidCategories, setZidCategories] = useState<ZidCategory[]>([]);
+  const [zidCategoriesFetched, setZidCategoriesFetched] = useState(false);
+
   // Scroll to bottom whenever messages change or typing starts
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
@@ -54,23 +53,66 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
     scrollToBottom();
   }, [messages, isTyping, scrollToBottom]);
 
-  // Initialize with welcome message
+  // Fetch live categories from Zid on mount
   useEffect(() => {
-    if (!isInitialized.current && messages.length === 0) {
+    if (zidCategoriesFetched) return;
+    setZidCategoriesFetched(true);
+
+    fetch("/api/store/categories/zid")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.categories && data.categories.length > 0) {
+          setZidCategories(data.categories);
+        }
+      })
+      .catch(() => {/* silently fail — store may not be connected yet */});
+  }, [zidCategoriesFetched]);
+
+  // Build the smart welcome message
+  const buildWelcomeMessage = useCallback((cats: ZidCategory[]) => {
+    if (cats.length > 0) {
+      const catList = cats.slice(0, 5).map((c) => (language === "ar" ? c.nameAr : c.nameEn)).join(", ");
+      const more = cats.length > 5 ? (language === "en" ? ` and ${cats.length - 5} more` : ` و${cats.length - 5} أخرى`) : "";
+      return language === "en"
+        ? `Hello! I'm your LaunchKit AI assistant. I can see your Zid store already has ${cats.length} categories: ${catList}${more}. Tell me about your business and I'll help you review, improve, and expand your store setup!`
+        : `مرحباً! أنا مساعد لاينش كيت الذكي. أرى أن متجرك على زد يحتوي على ${cats.length} فئات: ${catList}${more}. أخبرني عن نشاطك التجاري وسأساعدك في مراجعة وتحسين وتوسيع إعداد متجرك!`;
+    }
+    return language === "en"
+      ? "Hello! I'm your LaunchKit AI assistant. I'm here to help you set up your online store step by step. To get started — what type of products do you sell? Tell me about your business!"
+      : "مرحباً! أنا مساعد لاينش كيت الذكي. أنا هنا لمساعدتك في إعداد متجرك الإلكتروني خطوة بخطوة. للبدء — ما نوع المنتجات التي تبيعها؟ أخبرني عن نشاطك التجاري!";
+  }, [language]);
+
+  // Initialize with smart welcome message (wait briefly for zid categories fetch)
+  useEffect(() => {
+    if (isInitialized.current || messages.length > 0) return;
+
+    // Wait up to 800ms for Zid categories to arrive, then show welcome
+    const timer = setTimeout(() => {
+      if (isInitialized.current) return;
       isInitialized.current = true;
       addMessage({
         id: generateId(),
         role: "assistant",
-        content: WELCOME_MESSAGES[language] || WELCOME_MESSAGES.en,
+        content: buildWelcomeMessage(zidCategories),
         timestamp: new Date(),
       });
-    }
-  }, [language, messages.length, addMessage]);
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [language, messages.length, addMessage, buildWelcomeMessage, zidCategories]);
+
+  // Build context string about existing Zid categories to inject into every AI call
+  const buildCategoryContext = useCallback((): string => {
+    if (zidCategories.length === 0) return "";
+    const list = zidCategories
+      .map((c) => `- ${c.nameAr} / ${c.nameEn}${c.productsCount > 0 ? ` (${c.productsCount} products)` : ""}`)
+      .join("\n");
+    return `\n\n[STORE CONTEXT — existing Zid categories (${zidCategories.length} total)]:\n${list}\nConsider these when making suggestions. Don't re-suggest categories that already exist unless improving them.`;
+  }, [zidCategories]);
 
   const handleSend = async (text: string) => {
     if (!text.trim()) return;
 
-    // Add user message
     const userMsg: ChatMessage = {
       id: generateId(),
       role: "user",
@@ -81,25 +123,42 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
     setIsTyping(true);
 
     try {
-      // Build history for context (exclude welcome message)
       const history = messages.map((m) => ({
         role: m.role,
         content: m.content,
       }));
 
+      // Append category context to the message so AI knows what's already in the store
+      const categoryContext = buildCategoryContext();
+      const enrichedMessage = categoryContext ? `${text}${categoryContext}` : text;
+
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: text,
+          message: enrichedMessage,
           sessionId,
           history,
+          // Pass existing category count as metadata for smart prompting
+          storeContext: {
+            existingCategoryCount: zidCategories.length,
+            existingCategories: zidCategories.map((c) => ({ id: c.id, nameAr: c.nameAr, nameEn: c.nameEn })),
+          },
         }),
       });
 
       if (!res.ok) throw new Error("API error");
 
       const data = await res.json();
+
+      // If AI returns suggest_categories, inject the live Zid categories into the action data
+      // so CategoryCard can show "existing" vs "new to add"
+      if (data.action?.type === "suggest_categories" && zidCategories.length > 0) {
+        data.action.data = {
+          ...data.action.data,
+          existingCategories: zidCategories,
+        };
+      }
 
       const aiMsg: ChatMessage = {
         id: generateId(),
@@ -155,36 +214,35 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
     setCurrentStep("products");
     setCompletionPercentage(50);
 
-    // Send confirmation message to continue
     setTimeout(() => {
+      const addedCount = newCategories.length;
       handleSend(
         language === "en"
-          ? `Great, I've confirmed ${newCategories.length} categories. Now let's add products.`
-          : `تم تأكيد ${newCategories.length} فئات. الآن دعنا نضيف المنتجات.`
+          ? `Categories updated! Added ${addedCount} new categories. Now let's add products.`
+          : `تم تحديث الفئات! أضفت ${addedCount} فئات جديدة. الآن دعنا نضيف المنتجات.`
       );
     }, 500);
   };
 
   const handleProductConfirm = (product: unknown) => {
-    const p = product as { 
-      nameAr?: string; 
-      nameEn?: string; 
+    const p = product as {
+      nameAr?: string;
+      nameEn?: string;
       name_ar?: string;
       name_en?: string;
-      descriptionAr?: string; 
-      descriptionEn?: string; 
+      descriptionAr?: string;
+      descriptionEn?: string;
       description_ar?: string;
       description_en?: string;
-      price?: number; 
+      price?: number;
       variants?: [];
       id?: string;
       created_at?: string;
     };
-    
-    // Support both camelCase (from AI action) and snake_case (from API/Supabase)
+
     const nameAr = p.nameAr || p.name_ar || "";
     const nameEn = p.nameEn || p.name_en || "";
-    
+
     addProduct({
       id: p.id || generateId(),
       session_id: sessionId,
