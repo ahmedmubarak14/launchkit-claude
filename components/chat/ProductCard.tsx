@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Check, ShoppingBag, Tag as TagIcon, DollarSign, Pencil, Store } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Check, ShoppingBag, DollarSign, Pencil, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AIAction } from "@/types";
+
+interface ZidCat { id: string; nameAr: string; nameEn: string; }
 
 interface ProductCardProps {
   action: AIAction;
@@ -16,11 +18,31 @@ interface ProductCardProps {
 export function ProductCard({ action, sessionId, language, onConfirm }: ProductCardProps) {
   const [confirmed, setConfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [zidCategories, setZidCategories] = useState<ZidCat[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
   const data = action.data;
   const isRTL = language === "ar";
 
-  // Parse variants as size/color chips
   const variants = data?.variants || [];
+
+  // Fetch live Zid categories so user can assign product to one
+  useEffect(() => {
+    fetch("/api/store/categories/zid")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.categories?.length > 0) {
+          setZidCategories(d.categories);
+          // Auto-select first category
+          setSelectedCategoryId(d.categories[0].id);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const selectedCat = zidCategories.find((c) => c.id === selectedCategoryId);
+  const selectedCatName = selectedCat
+    ? (isRTL ? selectedCat.nameAr : selectedCat.nameEn)
+    : (language === "en" ? "Uncategorized" : "بدون فئة");
 
   const handleConfirm = async () => {
     setLoading(true);
@@ -28,11 +50,18 @@ export function ProductCard({ action, sessionId, language, onConfirm }: ProductC
       const res = await fetch("/api/store/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product: data, sessionId }),
+        body: JSON.stringify({
+          product: {
+            ...data,
+            categoryId: selectedCategoryId || null,
+          },
+          sessionId,
+        }),
       });
       if (res.ok) {
+        const result = await res.json();
         setConfirmed(true);
-        onConfirm(data);
+        onConfirm(result.product || data);
       }
     } finally {
       setLoading(false);
@@ -51,6 +80,9 @@ export function ProductCard({ action, sessionId, language, onConfirm }: ProductC
           </p>
           <p className="text-xs text-emerald-500 mt-0.5">
             {isRTL ? data?.nameAr : data?.nameEn}
+            {selectedCat && (
+              <span className="ml-1 opacity-70">· {isRTL ? selectedCat.nameAr : selectedCat.nameEn}</span>
+            )}
           </p>
         </div>
       </div>
@@ -90,19 +122,37 @@ export function ProductCard({ action, sessionId, language, onConfirm }: ProductC
 
           {/* Details */}
           <div className="flex-1 min-w-0 space-y-1.5">
-            {/* Arabic name (bold) */}
             <h4 className="font-bold text-gray-900 text-sm leading-snug" dir="rtl">
               {data?.nameAr}
             </h4>
-            {/* English name */}
             <p className="text-gray-400 text-xs font-medium">{data?.nameEn}</p>
 
-            {/* Category badge */}
-            <div className="flex items-center gap-1">
-              <Badge className="bg-violet-50 text-violet-600 border border-violet-100 text-[10px] px-2 py-0.5 font-medium gap-1">
-                <Store className="w-2.5 h-2.5" />
-                {language === "en" ? "General" : "عام"}
-              </Badge>
+            {/* Category selector */}
+            <div className="relative">
+              {zidCategories.length > 0 ? (
+                <div className="relative inline-flex items-center">
+                  <select
+                    value={selectedCategoryId}
+                    onChange={(e) => setSelectedCategoryId(e.target.value)}
+                    className="appearance-none text-[11px] font-semibold text-violet-700 bg-violet-50 border border-violet-100 rounded-lg pl-2 pr-6 py-1 cursor-pointer hover:border-violet-300 transition-colors outline-none"
+                    dir={isRTL ? "rtl" : "ltr"}
+                  >
+                    <option value="">
+                      {language === "en" ? "— No category —" : "— بدون فئة —"}
+                    </option>
+                    {zidCategories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {isRTL ? cat.nameAr : cat.nameEn}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-violet-400 pointer-events-none" />
+                </div>
+              ) : (
+                <Badge className="bg-violet-50 text-violet-600 border border-violet-100 text-[10px] px-2 py-0.5 font-medium">
+                  {language === "en" ? "No categories yet" : "لا توجد فئات بعد"}
+                </Badge>
+              )}
             </div>
 
             {/* Price */}
@@ -173,7 +223,9 @@ export function ProductCard({ action, sessionId, language, onConfirm }: ProductC
             ) : (
               <>
                 <Check className="w-3.5 h-3.5" />
-                {language === "en" ? "Add to Store" : "إضافة للمتجر"}
+                {language === "en"
+                  ? `Add to Store${selectedCat ? ` · ${isRTL ? selectedCat.nameAr : selectedCat.nameEn}` : ""}`
+                  : `إضافة للمتجر${selectedCat ? ` · ${selectedCat.nameAr}` : ""}`}
               </>
             )}
           </Button>
