@@ -9,6 +9,7 @@ import { CouponCard, CouponData } from "./CouponCard";
 import { ThemeCard } from "./ThemeCard";
 import { LogoCard } from "./LogoCard";
 import { BulkProductCard } from "./BulkProductCard";
+import { LandingPageCard } from "./LandingPageCard";
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -19,6 +20,7 @@ interface MessageBubbleProps {
   onThemeConfirm: (theme: StoreTheme) => void;
   onLogoConfirm: (logoUrl: string) => void;
   onBulkProductsConfirm: (products: BulkProductItem[]) => void;
+  onLandingPageConfirm?: (data: any) => void;
 }
 
 function timeAgo(date: Date): string {
@@ -38,6 +40,7 @@ export function MessageBubble({
   onThemeConfirm,
   onLogoConfirm,
   onBulkProductsConfirm,
+  onLandingPageConfirm,
 }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const isRTL = language === "ar";
@@ -60,11 +63,10 @@ export function MessageBubble({
       <div className={`flex flex-col gap-1.5 max-w-[78%] ${isUser ? "items-end" : "items-start"}`}>
         {/* Bubble */}
         <div
-          className={`relative px-4 py-3 ${
-            isUser
-              ? "bg-gradient-to-br from-violet-600 to-violet-700 text-white rounded-2xl rounded-br-sm shadow-md shadow-violet-200/50"
-              : "bg-white text-gray-800 border border-gray-100 rounded-2xl rounded-bl-sm shadow-sm"
-          }`}
+          className={`relative px-4 py-3 ${isUser
+            ? "bg-gradient-to-br from-violet-600 to-violet-700 text-white rounded-2xl rounded-br-sm shadow-md shadow-violet-200/50"
+            : "bg-white text-gray-800 border border-gray-100 rounded-2xl rounded-bl-sm shadow-sm"
+            }`}
         >
           <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
         </div>
@@ -117,6 +119,14 @@ export function MessageBubble({
                 sessionId={sessionId}
                 language={language}
                 onConfirm={onBulkProductsConfirm}
+              />
+            )}
+            {message.action.type === "generate_landing_page" && (
+              <LandingPageCard
+                action={message.action}
+                sessionId={sessionId}
+                language={language}
+                onConfirm={onLandingPageConfirm || (() => { })}
               />
             )}
           </div>

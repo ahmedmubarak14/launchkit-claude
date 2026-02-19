@@ -112,13 +112,14 @@ export interface LogoConfig {
 // ─── AI Actions ────────────────────────────────────────────────────────────────
 export interface AIAction {
   type:
-    | "none"
-    | "suggest_categories"
-    | "preview_product"
-    | "preview_coupon"
-    | "suggest_themes"
-    | "generate_logo"
-    | "bulk_products";
+  | "none"
+  | "suggest_categories"
+  | "preview_product"
+  | "preview_coupon"
+  | "suggest_themes"
+  | "generate_logo"
+  | "bulk_products"
+  | "generate_landing_page";
   data?: {
     // Existing
     categories?: Array<{ nameAr: string; nameEn: string }>;
@@ -128,6 +129,7 @@ export interface AIAction {
     descriptionEn?: string;
     price?: number;
     variants?: ProductVariant[];
+    imagePrompt?: string;
     // Theme
     themes?: StoreTheme[];
     // Logo

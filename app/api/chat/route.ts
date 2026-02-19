@@ -54,16 +54,19 @@ suggest_categories — when discussing store categories:
 {"type":"suggest_categories","data":{"categories":[{"nameAr":"اسم عربي","nameEn":"English Name"}]}}
 
 preview_product — for a single product:
-{"type":"preview_product","data":{"nameAr":"اسم المنتج","nameEn":"Product Name","descriptionAr":"وصف عربي","descriptionEn":"English description","price":99,"variants":[]}}
+{"type":"preview_product","data":{"nameAr":"اسم المنتج","nameEn":"Product Name","descriptionAr":"وصف عربي","descriptionEn":"English description","price":99,"variants":[],"imagePrompt":"A high-quality studio photo of [product] on a clean white background"}}
 
 bulk_products — when user lists multiple products OR uploads CSV:
 {"type":"bulk_products","data":{"products":[{"nameAr":"اسم","nameEn":"Name","price":50,"descriptionAr":"وصف","descriptionEn":"Desc"}]}}
 
-suggest_themes — when discussing design, colors, or branding (after products):
+suggest_themes — when discussing store design, colors, or themes (after products):
 {"type":"suggest_themes","data":{}}
 
 generate_logo — when user wants a logo (after theme or anytime they ask):
 {"type":"generate_logo","data":{"storeName":"Store Name","primaryColor":"#7C3AED","logoPrompt":"clean minimalist logo for a [type] store called [name]"}}
+
+generate_landing_page — when user asks to build or design a professional landing page for their store:
+{"type":"generate_landing_page","data":{"hero":{"headline":"The Best [Products]","subheadline":"Discover our new collection","cta":"Shop Now"},"features":[{"title":"Fast Shipping","description":"Within 24 hours","icon":"truck"}],"testimonials":[{"quote":"Amazing quality!","author":"Sarah"}],"primaryColor":"#7C3AED"}}
 
 none — for conversational responses:
 {"type":"none","data":{}}`;

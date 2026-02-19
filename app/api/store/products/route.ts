@@ -110,6 +110,36 @@ export async function POST(request: NextRequest) {
               console.error("[products] Category assignment error:", catErr);
             }
           }
+
+          // ── Push Image to Zid (separate Zid endpoint) ───────────────────────
+          if (zidProductId && product.imageUrl) {
+            try {
+              // Fetch the image to get a Blob for FormData
+              const imgFetch = await fetch(product.imageUrl);
+              const imgBlob = await imgFetch.blob();
+              const imgFile = new File([imgBlob], "product-image.jpg", { type: imgBlob.type });
+
+              const fd = new FormData();
+              fd.append("image", imgFile);
+
+              const imgRes = await fetch(`${BASE}/v1/products/${zidProductId}/images/`, {
+                method: "POST",
+                headers: {
+                  "Authorization": `Bearer ${store.auth_token || ""}`,
+                  "X-Manager-Token": store.access_token,
+                  "Store-Id": store.store_id,
+                  "Role": "Manager",
+                  "Accept-Language": "all-languages",
+                  // No Content-Type for FormData
+                },
+                body: fd,
+              });
+              const imgText = await imgRes.text();
+              console.log("[products] Image assignment:", imgRes.status, imgText.slice(0, 200));
+            } catch (imgErr) {
+              console.error("[products] Image assignment error:", imgErr);
+            }
+          }
         } else {
           console.error("[products] Zid product creation failed:", res.status, text);
           return NextResponse.json({

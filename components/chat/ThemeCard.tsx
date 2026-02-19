@@ -1,172 +1,84 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Palette, Sparkles } from "lucide-react";
+
+import { ExternalLink, Palette, Sparkles, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { AIAction, StoreTheme } from "@/types";
-import { STORE_THEMES } from "@/lib/themes";
+import { AIAction } from "@/types";
 
 interface ThemeCardProps {
   action: AIAction;
   sessionId: string;
   language: "en" | "ar";
-  onConfirm: (theme: StoreTheme) => void;
+  onConfirm: (data: any) => void;
 }
 
-const STYLE_LABELS: Record<string, { en: string; ar: string }> = {
-  modern: { en: "Modern", ar: "عصري" },
-  minimal: { en: "Minimal", ar: "بسيط" },
-  bold: { en: "Bold", ar: "جريء" },
-  elegant: { en: "Elegant", ar: "أنيق" },
-};
-
-export function ThemeCard({ sessionId, language, onConfirm }: ThemeCardProps) {
-  const [selected, setSelected] = useState<StoreTheme | null>(null);
+export function ThemeCard({ language, onConfirm }: ThemeCardProps) {
   const [confirmed, setConfirmed] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const isRTL = language === "ar";
 
-  const handleConfirm = async () => {
-    if (!selected) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/store/theme", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ themeId: selected.id, sessionId }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setConfirmed(true);
-        onConfirm(selected);
-      } else {
-        const msg = data.error || (language === "en" ? "Failed to save theme" : "فشل حفظ الثيم");
-        setError(msg);
-        console.error("Theme apply error:", data);
-        // Still confirm on frontend — theme preference is cosmetic
-        // even if DB save failed, let user continue
-        setConfirmed(true);
-        onConfirm(selected);
-      }
-    } catch (err) {
-      console.error("Theme apply error:", err);
-      // Still confirm — network error shouldn't block UI flow
-      setConfirmed(true);
-      onConfirm(selected);
-    } finally {
-      setLoading(false);
-    }
+  const handleConfirm = () => {
+    setConfirmed(true);
+    onConfirm({ chosenExternal: true });
   };
 
-  if (confirmed && selected) {
+  if (confirmed) {
     return (
-      <div className="bg-gradient-to-r from-emerald-50 to-emerald-50/50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3 shadow-sm">
+      <div className="bg-gradient-to-r from-emerald-50 to-emerald-50/50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3 shadow-sm" dir={isRTL ? "rtl" : "ltr"}>
         <div className="w-9 h-9 rounded-full bg-emerald-100 border border-emerald-200 flex items-center justify-center flex-shrink-0">
           <Check className="w-4 h-4 text-emerald-600" />
         </div>
-        <div className="flex-1">
+        <div>
           <p className="text-sm font-semibold text-emerald-700">
-            {language === "en" ? "Theme applied!" : "تم تطبيق الثيم!"}
+            {language === "en" ? "Theme step completed!" : "اكتملت خطوة الثيم!"}
           </p>
           <p className="text-xs text-emerald-500 mt-0.5">
-            {isRTL ? selected.nameAr : selected.nameEn}
+            {language === "en" ? "You've successfully set up your design direction." : "لقد قمت بإعداد اتجاه التصميم الخاص بك بنجاح."}
           </p>
-        </div>
-        {/* Color swatches */}
-        <div className="flex gap-1">
-          {Object.values(selected.colors).map((c, i) => (
-            <div key={i} className="w-5 h-5 rounded-full border border-white shadow-sm" style={{ backgroundColor: c }} />
-          ))}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-gradient-to-br from-violet-50 to-purple-50/60 border border-violet-100 rounded-2xl p-4 space-y-4 shadow-sm" dir={isRTL ? "rtl" : "ltr"}>
+    <div className="bg-gradient-to-br from-violet-50 to-purple-50/60 border border-violet-100 rounded-2xl p-5 space-y-4 shadow-sm" dir={isRTL ? "rtl" : "ltr"}>
       {/* Header */}
       <div className="flex items-center gap-2">
-        <div className="w-7 h-7 rounded-lg bg-violet-100 border border-violet-200 flex items-center justify-center">
-          <Palette className="w-3.5 h-3.5 text-violet-600" />
+        <div className="w-8 h-8 rounded-lg bg-violet-100 border border-violet-200 flex items-center justify-center">
+          <Palette className="w-4 h-4 text-violet-600" />
         </div>
-        <span className="text-sm font-semibold text-violet-800">
-          {language === "en" ? "Choose Your Store Theme" : "اختر ثيم متجرك"}
+        <span className="text-base font-bold text-violet-900">
+          {language === "en" ? "Choose Your Zid Theme" : "اختر ثيم متجرك من زد"}
         </span>
       </div>
 
-      {/* Theme grid */}
-      <div className="grid grid-cols-2 gap-2">
-        {STORE_THEMES.map((theme) => {
-          const isSelected = selected?.id === theme.id;
-          return (
-            <button
-              key={theme.id}
-              onClick={() => setSelected(theme)}
-              className={`relative text-left rounded-xl border-2 p-3 transition-all hover:shadow-md ${
-                isSelected
-                  ? "border-violet-500 bg-white shadow-md shadow-violet-100"
-                  : "border-transparent bg-white/70 hover:border-violet-200"
-              }`}
-            >
-              {/* Selected checkmark */}
-              {isSelected && (
-                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-violet-600 flex items-center justify-center">
-                  <Check className="w-3 h-3 text-white" />
-                </div>
-              )}
+      <p className="text-sm text-gray-600 leading-relaxed">
+        {language === "en"
+          ? "Professional, high-converting store themes are managed directly through the official Zid Theme Market. Explore dozens of free and premium designs tailored for your business."
+          : "تتم إدارة ثيمات المتاجر الاحترافية عالية التحويل مباشرة من خلال سوق ثيمات زد الرسمي. استكشف العشرات من التصميمات المجانية والمميزة المصممة خصيصًا لعملك."}
+      </p>
 
-              {/* Color swatches */}
-              <div className="flex gap-1 mb-2">
-                <div className="w-6 h-6 rounded-full border border-white/80 shadow-sm" style={{ backgroundColor: theme.colors.primary }} />
-                <div className="w-6 h-6 rounded-full border border-white/80 shadow-sm" style={{ backgroundColor: theme.colors.secondary }} />
-                <div className="w-6 h-6 rounded-full border border-white/80 shadow-sm" style={{ backgroundColor: theme.colors.accent }} />
-              </div>
+      {/* Action Buttons */}
+      <div className="flex flex-col gap-2.5 pt-2">
+        <a
+          href="https://apps.zid.sa/themes"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-700 hover:to-violet-800 text-white text-sm font-semibold rounded-xl px-5 py-3 shadow-md shadow-violet-200/60 transition-all hover:-translate-y-0.5"
+        >
+          <Sparkles className="w-4 h-4" />
+          {language === "en" ? "Browse Zid Theme Market" : "تصفح سوق ثيمات زد"}
+          <ExternalLink className="w-3.5 h-3.5 ml-1 opacity-80" />
+        </a>
 
-              {/* Name */}
-              <p className="text-xs font-bold text-gray-800 leading-tight">
-                {isRTL ? theme.nameAr : theme.nameEn}
-              </p>
-
-              {/* Style badge */}
-              <span className="inline-block mt-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full" style={{ backgroundColor: theme.colors.secondary, color: theme.colors.primary }}>
-                {isRTL ? STYLE_LABELS[theme.style].ar : STYLE_LABELS[theme.style].en}
-              </span>
-
-              {/* Description */}
-              <p className="text-[10px] text-gray-400 mt-1 leading-tight line-clamp-2">
-                {isRTL ? theme.descriptionAr : theme.descriptionEn}
-              </p>
-            </button>
-          );
-        })}
+        <Button
+          onClick={handleConfirm}
+          variant="outline"
+          className="w-full text-sm font-medium rounded-xl border-gray-200 text-gray-600 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700 py-3"
+        >
+          {language === "en" ? "I've chosen my theme (Continue)" : "لقد اخترت الثيم (متابعة)"}
+        </Button>
       </div>
-
-      {/* Confirm button */}
-      <Button
-        onClick={handleConfirm}
-        disabled={!selected || loading}
-        className="w-full bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-700 hover:to-violet-800 text-white text-sm font-semibold rounded-xl px-5 py-2.5 h-auto shadow-md shadow-violet-200/60 transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:translate-y-0 gap-2"
-      >
-        {loading ? (
-          <>
-            <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            {language === "en" ? "Applying..." : "جاري التطبيق..."}
-          </>
-        ) : (
-          <>
-            <Sparkles className="w-3.5 h-3.5" />
-            {selected
-              ? language === "en"
-                ? `Apply "${isRTL ? selected.nameAr : selected.nameEn}"`
-                : `تطبيق "${selected.nameAr}"`
-              : language === "en"
-              ? "Select a theme first"
-              : "اختر ثيماً أولاً"}
-          </>
-        )}
-      </Button>
     </div>
   );
 }

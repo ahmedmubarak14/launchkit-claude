@@ -21,6 +21,8 @@ export function ProductCard({ action, sessionId, language, onConfirm }: ProductC
   const [error, setError] = useState<string | null>(null);
   const [zidCategories, setZidCategories] = useState<ZidCat[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageLoading, setImageLoading] = useState(false);
   const data = action.data;
   const isRTL = language === "ar";
 
@@ -38,7 +40,23 @@ export function ProductCard({ action, sessionId, language, onConfirm }: ProductC
         }
       })
       .catch(() => { });
-  }, []);
+
+    // Try to fetch AI product image if AI provided an imagePrompt
+    if (data?.imagePrompt && !imageUrl && !imageLoading) {
+      setImageLoading(true);
+      fetch("/api/store/product-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: data.imagePrompt, sessionId }),
+      })
+        .then((res) => res.json())
+        .then((resData) => {
+          if (resData.imageUrl) setImageUrl(resData.imageUrl);
+        })
+        .catch(console.error)
+        .finally(() => setImageLoading(false));
+    }
+  }, [data?.imagePrompt, sessionId, imageUrl, imageLoading]);
 
   const selectedCat = zidCategories.find((c) => c.id === selectedCategoryId);
   const selectedCatName = selectedCat
@@ -56,6 +74,7 @@ export function ProductCard({ action, sessionId, language, onConfirm }: ProductC
           product: {
             ...data,
             categoryId: selectedCategoryId || null,
+            imageUrl, // Pass generated imageUrl to backend
           },
           sessionId,
         }),
@@ -123,12 +142,20 @@ export function ProductCard({ action, sessionId, language, onConfirm }: ProductC
       {/* Main content */}
       <div className="p-4">
         <div className="flex gap-4">
-          {/* Image placeholder */}
-          <div className="w-24 h-24 rounded-xl bg-gradient-to-br from-gray-100 to-gray-50 border border-gray-100 flex-shrink-0 flex flex-col items-center justify-center gap-1 shadow-inner">
-            <ShoppingBag className="w-7 h-7 text-gray-300" />
-            <span className="text-[9px] text-gray-300 font-medium">
-              {language === "en" ? "Image" : "صورة"}
-            </span>
+          {/* Image placeholder or AI image */}
+          <div className="w-24 h-24 rounded-xl bg-gradient-to-br from-gray-100 to-gray-50 border border-gray-100 flex-shrink-0 flex flex-col items-center justify-center gap-1 shadow-inner relative overflow-hidden">
+            {imageUrl ? (
+              <img src={imageUrl} alt={data?.nameEn || "Product"} className="w-full h-full object-cover" />
+            ) : imageLoading ? (
+              <div className="w-5 h-5 border-2 border-violet-200 border-t-violet-600 rounded-full animate-spin" />
+            ) : (
+              <>
+                <ShoppingBag className="w-7 h-7 text-gray-300" />
+                <span className="text-[9px] text-gray-300 font-medium">
+                  {language === "en" ? "Image" : "صورة"}
+                </span>
+              </>
+            )}
           </div>
 
           {/* Details */}

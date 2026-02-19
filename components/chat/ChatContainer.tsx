@@ -319,6 +319,19 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
     }
   };
 
+  const handleLandingPageConfirm = (landingPageData: any) => {
+    // In a real app we'd save this generated layout to the DB
+    // For now we just acknowledge it and move the progress bar
+    setCompletionPercentage(95);
+    setTimeout(() => {
+      handleSend(
+        language === "en"
+          ? "I've saved your landing page layout! Is there anything else you'd like to do to set up your store today?"
+          : "لقد حفظت تخطيط صفحتك المقصودة! هل هناك أي شيء آخر تود القيام به لإعداد متجرك اليوم؟"
+      );
+    }, 500);
+  };
+
   const handleCSVUpload = (parsedProducts: BulkProductItem[]) => {
     const bulkMsg: ChatMessage = {
       id: generateId(),
@@ -357,6 +370,7 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
             onThemeConfirm={handleThemeConfirm}
             onLogoConfirm={handleLogoConfirm}
             onBulkProductsConfirm={handleBulkProductsConfirm}
+            onLandingPageConfirm={handleLandingPageConfirm}
           />
         ))}
 
