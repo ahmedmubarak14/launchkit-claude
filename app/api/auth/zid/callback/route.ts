@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
   const error = searchParams.get("error");
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
 
   if (error || !code) {
-    return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL}/connect?error=${error || "no_code"}`
-    );
+    return NextResponse.redirect(`${appUrl}/connect?error=${error || "no_code"}`);
+  }
+
+  // Read user ID from the cookie we set in the authorize route
+  const userId = request.cookies.get("zid_oauth_user_id")?.value;
+  if (!userId) {
+    return NextResponse.redirect(`${appUrl}/login`);
   }
 
   try {
@@ -32,7 +37,7 @@ export async function GET(request: NextRequest) {
     }
 
     const tokens = await tokenResponse.json();
-    
+
     // Get store info from Zid
     const storeResponse = await fetch(`${process.env.ZID_API_BASE_URL}/v1/manager/account/info`, {
       headers: {
@@ -42,17 +47,15 @@ export async function GET(request: NextRequest) {
     });
 
     const storeInfo = storeResponse.ok ? await storeResponse.json() : {};
-    
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!user) {
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
-    }
+    // Use service role to bypass RLS — session cookie may be lost after OAuth redirect
+    const adminSupabase = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
-    // Save store to DB
-    await supabase.from("stores").upsert({
-      user_id: user.id,
+    await adminSupabase.from("stores").upsert({
+      user_id: userId,
       platform: "zid",
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token || null,
@@ -60,11 +63,12 @@ export async function GET(request: NextRequest) {
       store_id: storeInfo?.store?.id?.toString() || null,
     });
 
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/setup`);
+    const response = NextResponse.redirect(`${appUrl}/setup`);
+    // Clear the temporary cookie
+    response.cookies.set("zid_oauth_user_id", "", { maxAge: 0, path: "/" });
+    return response;
   } catch (err) {
     console.error("Zid OAuth error:", err);
-    return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL}/connect?error=oauth_failed`
-    );
+    return NextResponse.redirect(`${appUrl}/connect?error=oauth_failed`);
   }
 }
