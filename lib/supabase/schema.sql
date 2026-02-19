@@ -20,12 +20,20 @@ CREATE TABLE IF NOT EXISTS public.stores (
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
   platform TEXT DEFAULT 'zid' CHECK (platform IN ('zid', 'salla', 'shopify')),
   access_token TEXT NOT NULL,
+  auth_token TEXT,          -- Zid's separate "authorization" bearer token
   refresh_token TEXT,
   store_name TEXT NOT NULL,
   store_id TEXT,
+  theme_id TEXT,            -- Selected theme preset id (e.g. "desert-gold")
+  logo_url TEXT,            -- SVG data URI or AI-generated image URL
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Migration: add missing columns to existing stores table
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS auth_token TEXT;
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS theme_id TEXT;
+ALTER TABLE public.stores ADD COLUMN IF NOT EXISTS logo_url TEXT;
 
 -- Setup sessions table
 CREATE TABLE IF NOT EXISTS public.setup_sessions (
