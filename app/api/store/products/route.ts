@@ -59,15 +59,22 @@ export async function POST(request: NextRequest) {
         "Content-Type": "application/json",
       };
 
-      // Body per official Zid docs — JSON with flat "name" field
+      // Body per official Zid docs — name and description should be objects with ar/en
       const body = {
-        name: product.nameAr || product.nameEn || "Product",
+        name: {
+          ar: product.nameAr || product.nameEn || "منتج جديد",
+          en: product.nameEn || product.nameAr || "New Product"
+        },
+        description: {
+          ar: product.descriptionAr || "",
+          en: product.descriptionEn || ""
+        },
         price: Number(product.price) || 0,
         sku,
         is_draft: false,
         is_infinite: true,
         quantity: 999,
-        requires_shipping: true,
+        requires_shipping: false, // Set to false to avoid weight/shipping requirements causing silent failures
         is_taxable: false,
       };
 
