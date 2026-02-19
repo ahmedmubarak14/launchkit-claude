@@ -31,32 +31,41 @@ export async function POST(request: NextRequest) {
     if (store?.access_token) {
       for (const cat of categories) {
         try {
-          const zidRes = await fetch(`${process.env.ZID_API_BASE_URL}/v1/managers/store/category`, {
+          // Zid requires multipart/form-data for categories
+          const formData = new FormData();
+          formData.append("name[ar]", cat.nameAr);
+          formData.append("name[en]", cat.nameEn);
+          formData.append("description[ar]", "");
+          formData.append("description[en]", "");
+
+          const zidRes = await fetch(`${process.env.ZID_API_BASE_URL}/v1/managers/store/categories/add`, {
             method: "POST",
             headers: {
-              "Authorization": `Bearer ${store.access_token}`,
-              "Content-Type": "application/json",
+              // X-Manager-Token is the OAuth access token (store-level auth)
+              "X-Manager-Token": store.access_token,
+              // Authorization is the partner-level token (client secret)
+              "Authorization": `Bearer ${process.env.ZID_CLIENT_SECRET}`,
               "Accept-Language": "ar",
             },
-            body: JSON.stringify({
-              name: { ar: cat.nameAr, en: cat.nameEn },
-              description: { ar: "", en: "" },
-              active: true,
-            }),
+            body: formData,
           });
 
+          const responseText = await zidRes.text();
+          console.log(`Zid category response for "${cat.nameEn}":`, zidRes.status, responseText);
+
           if (zidRes.ok) {
-            const zidData = await zidRes.json();
-            const zidId = zidData?.category?.id?.toString() || zidData?.id?.toString();
+            const zidData = JSON.parse(responseText);
+            const zidId = zidData?.category?.id?.toString();
             if (zidId) zidResults[cat.nameEn] = zidId;
           } else {
-            const errText = await zidRes.text();
-            console.error(`Zid category create failed for "${cat.nameEn}":`, zidRes.status, errText);
+            console.error(`Zid category create failed for "${cat.nameEn}":`, zidRes.status, responseText);
           }
         } catch (err) {
           console.error(`Zid category push error for "${cat.nameEn}":`, err);
         }
       }
+    } else {
+      console.log("No store access token found, skipping Zid push");
     }
 
     // Save categories to Supabase with Zid platform_id if available

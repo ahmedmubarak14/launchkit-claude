@@ -30,39 +30,46 @@ export async function POST(request: NextRequest) {
     let zidProductId: string | null = null;
     if (store?.access_token) {
       try {
-        const zidRes = await fetch(`${process.env.ZID_API_BASE_URL}/v1/managers/store/product`, {
+        const sku = `LK-${Date.now()}`;
+        const zidBody: Record<string, unknown> = {
+          name: product.nameAr || product.nameEn, // Zid uses a single name field
+          price: product.price || 0,
+          sku,
+          is_draft: false,
+          is_infinite: true,
+          requires_shipping: true,
+          is_taxable: false,
+        };
+
+        const zidRes = await fetch(`${process.env.ZID_API_BASE_URL}/v1/products/`, {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${store.access_token}`,
+            // X-Manager-Token is the OAuth access token (store-level auth)
+            "X-Manager-Token": store.access_token,
+            // Authorization is the partner-level token
+            "Authorization": `Bearer ${process.env.ZID_CLIENT_SECRET}`,
             "Content-Type": "application/json",
             "Accept-Language": "ar",
+            "Role": "Manager",
+            ...(store.store_id ? { "Store-Id": store.store_id } : {}),
           },
-          body: JSON.stringify({
-            name: { ar: product.nameAr, en: product.nameEn },
-            description: { ar: product.descriptionAr || "", en: product.descriptionEn || "" },
-            price: product.price || 0,
-            active: true,
-            quantity: 100,
-            unlimited_quantity: false,
-            ...(product.variants && product.variants.length > 0 && {
-              attributes: product.variants.map((v: { name_en?: string; options?: string[] }) => ({
-                name: v.name_en || "Option",
-                values: v.options || [],
-              })),
-            }),
-          }),
+          body: JSON.stringify(zidBody),
         });
 
+        const responseText = await zidRes.text();
+        console.log("Zid product response:", zidRes.status, responseText);
+
         if (zidRes.ok) {
-          const zidData = await zidRes.json();
+          const zidData = JSON.parse(responseText);
           zidProductId = zidData?.product?.id?.toString() || zidData?.id?.toString() || null;
         } else {
-          const errText = await zidRes.text();
-          console.error("Zid product create failed:", zidRes.status, errText);
+          console.error("Zid product create failed:", zidRes.status, responseText);
         }
       } catch (err) {
         console.error("Zid product push error:", err);
       }
+    } else {
+      console.log("No store access token found, skipping Zid push");
     }
 
     // Save product to Supabase with Zid platform_id if available
