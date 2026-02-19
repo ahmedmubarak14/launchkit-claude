@@ -16,6 +16,8 @@ export interface Store {
   refresh_token: string | null;
   store_name: string;
   store_id: string | null;
+  logo_url?: string | null;
+  theme_id?: string | null;
   created_at: string;
 }
 
@@ -66,9 +68,50 @@ export interface ProductVariant {
   options: string[];
 }
 
+// ─── New: Theme ────────────────────────────────────────────────────────────────
+export interface StoreTheme {
+  id: string;
+  nameEn: string;
+  nameAr: string;
+  style: "modern" | "minimal" | "bold" | "elegant";
+  colors: {
+    primary: string;
+    secondary: string;
+    accent: string;
+  };
+  descriptionEn: string;
+  descriptionAr: string;
+}
+
+// ─── New: Bulk Product ─────────────────────────────────────────────────────────
+export interface BulkProductItem {
+  nameAr: string;
+  nameEn: string;
+  price: number;
+  descriptionAr?: string;
+  descriptionEn?: string;
+}
+
+// ─── New: Logo Config ──────────────────────────────────────────────────────────
+export interface LogoConfig {
+  storeName: string;
+  storeNameAr?: string;
+  primaryColor: string;
+  style: "initials" | "wordmark" | "icon+text";
+}
+
+// ─── AI Actions ────────────────────────────────────────────────────────────────
 export interface AIAction {
-  type: "none" | "suggest_categories" | "preview_product" | "preview_coupon";
+  type:
+    | "none"
+    | "suggest_categories"
+    | "preview_product"
+    | "preview_coupon"
+    | "suggest_themes"
+    | "generate_logo"
+    | "bulk_products";
   data?: {
+    // Existing
     categories?: Array<{ nameAr: string; nameEn: string }>;
     nameAr?: string;
     nameEn?: string;
@@ -76,6 +119,14 @@ export interface AIAction {
     descriptionEn?: string;
     price?: number;
     variants?: ProductVariant[];
+    // Theme
+    themes?: StoreTheme[];
+    // Logo
+    storeName?: string;
+    primaryColor?: string;
+    logoPrompt?: string;
+    // Bulk products
+    products?: BulkProductItem[];
   };
 }
 

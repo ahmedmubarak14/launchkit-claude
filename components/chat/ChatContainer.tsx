@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { useAppStore } from "@/store/useStore";
-import { ChatMessage, AIAction } from "@/types";
+import { ChatMessage, AIAction, StoreTheme, BulkProductItem } from "@/types";
 import { MessageBubble, TypingIndicator } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
 
@@ -33,6 +33,8 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
     addCategory,
     products,
     addProduct,
+    setSelectedTheme,
+    setLogoUrl,
   } = useAppStore();
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -115,6 +117,14 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
       } else if (data.action?.type === "preview_product" && currentStep === "categories") {
         setCurrentStep("products");
         setCompletionPercentage(50);
+      } else if (data.action?.type === "bulk_products" && currentStep === "categories") {
+        setCurrentStep("products");
+        setCompletionPercentage(50);
+      } else if (data.action?.type === "suggest_themes") {
+        setCurrentStep("marketing");
+        setCompletionPercentage(75);
+      } else if (data.action?.type === "generate_logo") {
+        setCompletionPercentage(88);
       }
     } catch {
       addMessage({
@@ -156,18 +166,36 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
   };
 
   const handleProductConfirm = (product: unknown) => {
-    const p = product as { nameAr: string; nameEn: string; descriptionAr?: string; descriptionEn?: string; price?: number; variants?: [] };
+    const p = product as { 
+      nameAr?: string; 
+      nameEn?: string; 
+      name_ar?: string;
+      name_en?: string;
+      descriptionAr?: string; 
+      descriptionEn?: string; 
+      description_ar?: string;
+      description_en?: string;
+      price?: number; 
+      variants?: [];
+      id?: string;
+      created_at?: string;
+    };
+    
+    // Support both camelCase (from AI action) and snake_case (from API/Supabase)
+    const nameAr = p.nameAr || p.name_ar || "";
+    const nameEn = p.nameEn || p.name_en || "";
+    
     addProduct({
-      id: generateId(),
+      id: p.id || generateId(),
       session_id: sessionId,
       platform_id: null,
-      name_ar: p.nameAr,
-      name_en: p.nameEn,
-      description_ar: p.descriptionAr || null,
-      description_en: p.descriptionEn || null,
+      name_ar: nameAr,
+      name_en: nameEn,
+      description_ar: p.descriptionAr || p.description_ar || null,
+      description_en: p.descriptionEn || p.description_en || null,
       price: p.price || 0,
       variants: p.variants || [],
-      created_at: new Date().toISOString(),
+      created_at: p.created_at || new Date().toISOString(),
     });
 
     if (products.length + 1 >= 3) {
@@ -177,12 +205,73 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
   };
 
   const handleImageUpload = (file: File) => {
-    // Image upload handler — send a descriptive message
     handleSend(
       language === "en"
         ? `I uploaded an image of my product: ${file.name}`
         : `قمت برفع صورة منتجي: ${file.name}`
     );
+  };
+
+  const handleThemeConfirm = (theme: StoreTheme) => {
+    setSelectedTheme(theme);
+    setCompletionPercentage(88);
+    setTimeout(() => {
+      handleSend(
+        language === "en"
+          ? `I applied the "${theme.nameEn}" theme. Now let's create a logo!`
+          : `تم تطبيق ثيم "${theme.nameAr}". الآن لننشئ الشعار!`
+      );
+    }, 500);
+  };
+
+  const handleLogoConfirm = (url: string) => {
+    setLogoUrl(url);
+    setCompletionPercentage(100);
+    setTimeout(() => {
+      handleSend(
+        language === "en"
+          ? "Logo saved! Your store is now fully set up. What else would you like to do?"
+          : "تم حفظ الشعار! متجرك الآن مُعدّ بالكامل. ماذا تريد أن تفعل بعد ذلك؟"
+      );
+    }, 500);
+  };
+
+  const handleBulkProductsConfirm = (confirmedProducts: BulkProductItem[]) => {
+    confirmedProducts.forEach((p) => {
+      addProduct({
+        id: generateId(),
+        session_id: sessionId,
+        platform_id: null,
+        name_ar: p.nameAr,
+        name_en: p.nameEn,
+        description_ar: p.descriptionAr || null,
+        description_en: p.descriptionEn || null,
+        price: p.price,
+        variants: [],
+        created_at: new Date().toISOString(),
+      });
+    });
+    if (products.length + confirmedProducts.length >= 3) {
+      setCurrentStep("marketing");
+      setCompletionPercentage(75);
+    }
+  };
+
+  const handleCSVUpload = (parsedProducts: BulkProductItem[]) => {
+    const bulkMsg: ChatMessage = {
+      id: generateId(),
+      role: "assistant",
+      content:
+        language === "en"
+          ? `I found ${parsedProducts.length} products in your CSV. Review them below and click "Add to Store" to create them all.`
+          : `وجدت ${parsedProducts.length} منتج في ملف CSV الخاص بك. راجعها أدناه واضغط "إضافة للمتجر" لإنشائها.`,
+      action: {
+        type: "bulk_products",
+        data: { products: parsedProducts },
+      },
+      timestamp: new Date(),
+    };
+    addMessage(bulkMsg);
   };
 
   const isFirstMessage = messages.length <= 1;
@@ -203,6 +292,9 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
             language={language}
             onCategoryConfirm={handleCategoryConfirm}
             onProductConfirm={handleProductConfirm}
+            onThemeConfirm={handleThemeConfirm}
+            onLogoConfirm={handleLogoConfirm}
+            onBulkProductsConfirm={handleBulkProductsConfirm}
           />
         ))}
 
@@ -217,6 +309,7 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
         <ChatInput
           onSend={handleSend}
           onImageUpload={handleImageUpload}
+          onCSVUpload={handleCSVUpload}
           disabled={isTyping}
           language={language}
           showQuickChips={isFirstMessage}

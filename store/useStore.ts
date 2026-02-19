@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { Language, ChatMessage, SetupStep, Category, Product } from "@/types";
+import { Language, ChatMessage, SetupStep, Category, Product, StoreTheme, BulkProductItem } from "@/types";
 
 interface AppState {
   // Language
@@ -36,6 +36,19 @@ interface AppState {
   products: Product[];
   setProducts: (prods: Product[]) => void;
   addProduct: (prod: Product) => void;
+
+  // Theme
+  selectedTheme: StoreTheme | null;
+  setSelectedTheme: (theme: StoreTheme | null) => void;
+
+  // Logo
+  logoUrl: string | null;
+  setLogoUrl: (url: string | null) => void;
+
+  // Bulk products pending confirmation
+  pendingBulkProducts: BulkProductItem[];
+  setPendingBulkProducts: (products: BulkProductItem[]) => void;
+  clearPendingBulkProducts: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -76,4 +89,17 @@ export const useAppStore = create<AppState>((set) => ({
   setProducts: (prods) => set({ products: prods }),
   addProduct: (prod) =>
     set((state) => ({ products: [...state.products, prod] })),
+
+  // Theme
+  selectedTheme: null,
+  setSelectedTheme: (theme) => set({ selectedTheme: theme }),
+
+  // Logo
+  logoUrl: null,
+  setLogoUrl: (url) => set({ logoUrl: url }),
+
+  // Bulk products
+  pendingBulkProducts: [],
+  setPendingBulkProducts: (products) => set({ pendingBulkProducts: products }),
+  clearPendingBulkProducts: () => set({ pendingBulkProducts: [] }),
 }));

@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useRef, KeyboardEvent } from "react";
-import { ArrowUp, ImagePlus, Mic } from "lucide-react";
+import { ArrowUp, ImagePlus, FileSpreadsheet } from "lucide-react";
+import { parseProductsFromCSV } from "@/lib/csv-parser";
+import { BulkProductItem } from "@/types";
 
 const QUICK_CHIPS = {
   en: [
@@ -21,6 +23,7 @@ const QUICK_CHIPS = {
 interface ChatInputProps {
   onSend: (message: string) => void;
   onImageUpload?: (file: File) => void;
+  onCSVUpload?: (products: BulkProductItem[]) => void;
   disabled?: boolean;
   language: "en" | "ar";
   showQuickChips?: boolean;
@@ -29,6 +32,7 @@ interface ChatInputProps {
 export function ChatInput({
   onSend,
   onImageUpload,
+  onCSVUpload,
   disabled,
   language,
   showQuickChips = true,
@@ -37,6 +41,7 @@ export function ChatInput({
   const [chipsVisible, setChipsVisible] = useState(showQuickChips);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const csvInputRef = useRef<HTMLInputElement>(null);
   const isRTL = language === "ar";
 
   const handleSend = () => {
@@ -76,6 +81,29 @@ export function ChatInput({
     }
   };
 
+  const handleCSVChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !onCSVUpload) return;
+    try {
+      const text = await file.text();
+      const products = parseProductsFromCSV(text);
+      if (products.length > 0) {
+        onCSVUpload(products);
+      } else {
+        // Notify user no products found
+        onSend(
+          language === "en"
+            ? `I uploaded a CSV file (${file.name}) but no products were found. Please check the column names: name_ar, name_en, price, description_ar, description_en`
+            : `رفعت ملف CSV (${file.name}) لكن لم يتم العثور على منتجات. تأكد من أسماء الأعمدة: name_ar, name_en, price`
+        );
+      }
+    } catch {
+      onSend(language === "en" ? "Failed to read the CSV file." : "فشل قراءة ملف CSV.");
+    }
+    // Reset input
+    e.target.value = "";
+  };
+
   const chips = QUICK_CHIPS[language];
 
   return (
@@ -112,6 +140,23 @@ export function ChatInput({
           type="file"
           accept="image/*"
           onChange={handleImageChange}
+          className="hidden"
+        />
+
+        {/* CSV upload */}
+        <button
+          onClick={() => csvInputRef.current?.click()}
+          disabled={disabled}
+          className="text-gray-400 hover:text-violet-500 transition-colors flex-shrink-0 mb-0.5 disabled:opacity-50"
+          title={language === "en" ? "Upload CSV (bulk products)" : "رفع CSV (منتجات جماعية)"}
+        >
+          <FileSpreadsheet className="w-5 h-5" />
+        </button>
+        <input
+          ref={csvInputRef}
+          type="file"
+          accept=".csv,text/csv,application/csv"
+          onChange={handleCSVChange}
           className="hidden"
         />
 

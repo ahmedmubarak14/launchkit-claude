@@ -2,10 +2,13 @@
 
 import { formatDistanceToNow } from "date-fns";
 import { Sparkles } from "lucide-react";
-import { ChatMessage } from "@/types";
+import { ChatMessage, StoreTheme, BulkProductItem } from "@/types";
 import { CategoryCard } from "./CategoryCard";
 import { ProductCard } from "./ProductCard";
 import { CouponCard, CouponData } from "./CouponCard";
+import { ThemeCard } from "./ThemeCard";
+import { LogoCard } from "./LogoCard";
+import { BulkProductCard } from "./BulkProductCard";
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -13,6 +16,9 @@ interface MessageBubbleProps {
   language: "en" | "ar";
   onCategoryConfirm: (categories: Array<{ nameAr: string; nameEn: string }>) => void;
   onProductConfirm: (product: unknown) => void;
+  onThemeConfirm: (theme: StoreTheme) => void;
+  onLogoConfirm: (logoUrl: string) => void;
+  onBulkProductsConfirm: (products: BulkProductItem[]) => void;
 }
 
 function timeAgo(date: Date): string {
@@ -29,6 +35,9 @@ export function MessageBubble({
   language,
   onCategoryConfirm,
   onProductConfirm,
+  onThemeConfirm,
+  onLogoConfirm,
+  onBulkProductsConfirm,
 }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const isRTL = language === "ar";
@@ -84,6 +93,30 @@ export function MessageBubble({
                 coupon={couponData}
                 sessionId={sessionId}
                 language={language}
+              />
+            )}
+            {message.action.type === "suggest_themes" && (
+              <ThemeCard
+                action={message.action}
+                sessionId={sessionId}
+                language={language}
+                onConfirm={onThemeConfirm}
+              />
+            )}
+            {message.action.type === "generate_logo" && (
+              <LogoCard
+                action={message.action}
+                sessionId={sessionId}
+                language={language}
+                onConfirm={onLogoConfirm}
+              />
+            )}
+            {message.action.type === "bulk_products" && (
+              <BulkProductCard
+                action={message.action}
+                sessionId={sessionId}
+                language={language}
+                onConfirm={onBulkProductsConfirm}
               />
             )}
           </div>
