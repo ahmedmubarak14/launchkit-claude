@@ -65,7 +65,7 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
           setZidCategories(data.categories);
         }
       })
-      .catch(() => {/* silently fail — store may not be connected yet */});
+      .catch(() => {/* silently fail — store may not be connected yet */ });
   }, [zidCategoriesFetched]);
 
   // Build the smart welcome message
@@ -147,9 +147,12 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
         }),
       });
 
-      if (!res.ok) throw new Error("API error");
-
       const data = await res.json();
+      if (!res.ok) {
+        const detail = data?.detail || data?.error || "Unknown error";
+        console.error("[chat] API error detail:", detail);
+        throw new Error(detail);
+      }
 
       // If AI returns suggest_categories, inject the live Zid categories into the action data
       // so CategoryCard can show "existing" vs "new to add"
@@ -185,14 +188,15 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
       } else if (data.action?.type === "generate_logo") {
         setCompletionPercentage(88);
       }
-    } catch {
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
       addMessage({
         id: generateId(),
         role: "assistant",
         content:
           language === "en"
-            ? "Sorry, I encountered an error. Please try again."
-            : "عذراً، حدث خطأ. يرجى المحاولة مرة أخرى.",
+            ? `Sorry, I encountered an error: ${errMsg}`
+            : `عذراً، حدث خطأ: ${errMsg}`,
         timestamp: new Date(),
       });
     } finally {
