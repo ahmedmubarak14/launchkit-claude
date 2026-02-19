@@ -143,7 +143,7 @@ export async function GET(_request: NextRequest) {
             "content-type": "application/json",
           },
           body: JSON.stringify({
-            model: "claude-sonnet-4-5-20250514",
+            model: "claude-3-5-sonnet-20241022",
             max_tokens: 50,
             messages: [{ role: "user", content: "Say OK" }],
           }),
