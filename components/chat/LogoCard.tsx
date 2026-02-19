@@ -79,8 +79,8 @@ export function LogoCard({ action, sessionId, language, onConfirm }: LogoCardPro
 
   const handleSave = async () => {
     setSaving(true);
+    const logoToSave = tab === "ai" && aiLogoUrl ? aiLogoUrl : svgDataUri;
     try {
-      const logoToSave = tab === "ai" && aiLogoUrl ? aiLogoUrl : svgDataUri;
       const res = await fetch("/api/store/logo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -91,9 +91,19 @@ export function LogoCard({ action, sessionId, language, onConfirm }: LogoCardPro
         setSavedLogoUrl(logoToSave);
         setConfirmed(true);
         onConfirm(logoToSave);
+      } else {
+        console.error("Logo save error:", data);
+        // Still confirm on frontend — don't block user over a DB write issue
+        setSavedLogoUrl(logoToSave);
+        setConfirmed(true);
+        onConfirm(logoToSave);
       }
     } catch (err) {
       console.error("Logo save error:", err);
+      // On network error still confirm so user can continue
+      setSavedLogoUrl(logoToSave);
+      setConfirmed(true);
+      onConfirm(logoToSave);
     } finally {
       setSaving(false);
     }

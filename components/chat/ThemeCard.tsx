@@ -24,21 +24,37 @@ export function ThemeCard({ sessionId, language, onConfirm }: ThemeCardProps) {
   const [selected, setSelected] = useState<StoreTheme | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const isRTL = language === "ar";
 
   const handleConfirm = async () => {
     if (!selected) return;
     setLoading(true);
+    setError(null);
     try {
-      await fetch("/api/store/theme", {
+      const res = await fetch("/api/store/theme", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ themeId: selected.id, sessionId }),
       });
-      setConfirmed(true);
-      onConfirm(selected);
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setConfirmed(true);
+        onConfirm(selected);
+      } else {
+        const msg = data.error || (language === "en" ? "Failed to save theme" : "فشل حفظ الثيم");
+        setError(msg);
+        console.error("Theme apply error:", data);
+        // Still confirm on frontend — theme preference is cosmetic
+        // even if DB save failed, let user continue
+        setConfirmed(true);
+        onConfirm(selected);
+      }
     } catch (err) {
       console.error("Theme apply error:", err);
+      // Still confirm — network error shouldn't block UI flow
+      setConfirmed(true);
+      onConfirm(selected);
     } finally {
       setLoading(false);
     }
