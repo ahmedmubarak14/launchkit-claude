@@ -16,10 +16,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get user's Zid store access token (use limit 1 in case of duplicate rows)
+    // Get user's Zid store tokens (use limit 1 in case of duplicate rows)
     const { data: storeRows } = await supabase
       .from("stores")
-      .select("access_token, store_id")
+      .select("access_token, auth_token, store_id")
       .eq("user_id", user.id)
       .eq("platform", "zid")
       .order("created_at", { ascending: false })
@@ -41,10 +41,8 @@ export async function POST(request: NextRequest) {
           const zidRes = await fetch(`${process.env.ZID_API_BASE_URL}/v1/managers/store/categories/add`, {
             method: "POST",
             headers: {
-              // X-Manager-Token is the OAuth access token (store-level auth)
               "X-Manager-Token": store.access_token,
-              // Authorization is the partner-level token (client secret)
-              "Authorization": `Bearer ${process.env.ZID_CLIENT_SECRET}`,
+              "Authorization": `Bearer ${store.auth_token}`,
               "Accept-Language": "ar",
             },
             body: formData,
