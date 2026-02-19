@@ -31,8 +31,9 @@ export async function POST(request: NextRequest) {
     if (store?.access_token) {
       try {
         const sku = `LK-${Date.now()}`;
+        // Zid product body — try with name_ar/name_en structure
         const zidBody: Record<string, unknown> = {
-          name: product.nameAr || product.nameEn, // Zid uses a single name field
+          name: { ar: product.nameAr || product.nameEn, en: product.nameEn || product.nameAr },
           price: product.price || 0,
           sku,
           is_draft: false,
@@ -41,16 +42,25 @@ export async function POST(request: NextRequest) {
           is_taxable: false,
         };
 
+        const zidHeaders: Record<string, string> = {
+          "X-Manager-Token": store.access_token,
+          "Content-Type": "application/json",
+          "Accept-Language": "ar",
+          "Role": "Manager",
+        };
+        if (store.auth_token) {
+          zidHeaders["Authorization"] = `Bearer ${store.auth_token}`;
+        }
+        if (store.store_id) {
+          zidHeaders["Store-Id"] = store.store_id;
+        }
+
+        console.log("Zid product request headers:", JSON.stringify(zidHeaders));
+        console.log("Zid product request body:", JSON.stringify(zidBody));
+
         const zidRes = await fetch(`${process.env.ZID_API_BASE_URL}/v1/products/`, {
           method: "POST",
-          headers: {
-            "X-Manager-Token": store.access_token,
-            "Authorization": `Bearer ${store.auth_token}`,
-            "Content-Type": "application/json",
-            "Accept-Language": "ar",
-            "Role": "Manager",
-            ...(store.store_id ? { "Store-Id": store.store_id } : {}),
-          },
+          headers: zidHeaders,
           body: JSON.stringify(zidBody),
         });
 
@@ -62,6 +72,24 @@ export async function POST(request: NextRequest) {
           zidProductId = zidData?.product?.id?.toString() || zidData?.id?.toString() || null;
         } else {
           console.error("Zid product create failed:", zidRes.status, responseText);
+          // Try fallback with flat name string
+          if (zidRes.status === 422 || zidRes.status === 400) {
+            console.log("Retrying with flat name string...");
+            const fallbackBody = { ...zidBody, name: product.nameAr || product.nameEn };
+            const fallbackRes = await fetch(`${process.env.ZID_API_BASE_URL}/v1/products/`, {
+              method: "POST",
+              headers: zidHeaders,
+              body: JSON.stringify(fallbackBody),
+            });
+            const fallbackText = await fallbackRes.text();
+            console.log("Zid product fallback response:", fallbackRes.status, fallbackText);
+            if (fallbackRes.ok) {
+              const fallbackData = JSON.parse(fallbackText);
+              zidProductId = fallbackData?.product?.id?.toString() || fallbackData?.id?.toString() || null;
+            } else {
+              console.error("Zid product fallback also failed:", fallbackRes.status, fallbackText);
+            }
+          }
         }
       } catch (err) {
         console.error("Zid product push error:", err);
