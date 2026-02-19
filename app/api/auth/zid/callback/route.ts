@@ -33,7 +33,9 @@ export async function GET(request: NextRequest) {
     });
 
     if (!tokenResponse.ok) {
-      throw new Error("Token exchange failed");
+      const errorBody = await tokenResponse.text();
+      console.error("Token exchange failed:", tokenResponse.status, errorBody);
+      throw new Error(`Token exchange failed: ${tokenResponse.status} ${errorBody}`);
     }
 
     const tokens = await tokenResponse.json();
