@@ -3,8 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 
 /**
  * GET /api/store/debug
- * Probes Zid endpoints to diagnose product creation issues.
- * Returns full status + truncated response bodies for each attempt.
+ * Tests the CORRECT Zid product endpoint (per official docs):
+ *   POST https://api.zid.sa/v1/products/
+ *   Headers: Authorization (Bearer), X-Manager-Token, Store-Id, Role: Manager
+ *   Body: JSON { name, price, sku, is_draft, is_infinite, ... }
  */
 export async function GET(_request: NextRequest) {
   try {
@@ -26,9 +28,9 @@ export async function GET(_request: NextRequest) {
 
     const storeInfo = {
       hasAccessToken: !!store?.access_token,
-      accessTokenPrefix: store?.access_token ? store.access_token.slice(0, 12) + "..." : null,
+      accessTokenPrefix: store?.access_token ? store.access_token.slice(0, 15) + "..." : null,
       hasAuthToken: !!store?.auth_token,
-      authTokenPrefix: store?.auth_token ? store.auth_token.slice(0, 12) + "..." : null,
+      authTokenPrefix: store?.auth_token ? store.auth_token.slice(0, 15) + "..." : null,
       store_id: store?.store_id,
       store_name: store?.store_name,
     };
@@ -37,110 +39,85 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ error: "No Zid store found", storeInfo });
     }
 
+    if (!store.store_id) {
+      return NextResponse.json({
+        error: "store_id is NULL — you need to reconnect your Zid store (disconnect and connect again)",
+        storeInfo,
+        fix: "The OAuth callback should have fetched your store_id. Re-connect at /connect.",
+      });
+    }
+
     const BASE = process.env.ZID_API_BASE_URL || "https://api.zid.sa";
     const sku = `DBG-${Date.now()}`;
     const results: Record<string, unknown> = {};
 
+    // ── Correct headers per Zid docs ──────────────────────────────────────────
     const headers: Record<string, string> = {
-      "X-Manager-Token": store.access_token,
       "Authorization": `Bearer ${store.auth_token || ""}`,
-      "Accept-Language": "ar",
+      "X-Manager-Token": store.access_token,
+      "Store-Id": store.store_id,
+      "Role": "Manager",
+      "Accept-Language": "en",
+      "Content-Type": "application/json",
     };
 
-    // ── Test 1: GET /v1/managers/store/ (verify auth works) ───────────────────
+    // ── Test 1: GET store info (verify auth) ──────────────────────────────────
     try {
-      const r = await fetch(`${BASE}/v1/managers/store/`, { headers });
-      const t = await r.text();
-      results["GET /v1/managers/store/"] = { status: r.status, body: t.slice(0, 500) };
-    } catch (e) {
-      results["GET /v1/managers/store/"] = { error: String(e) };
-    }
-
-    // ── Test 2: GET /v1/managers/store/products/ (list products) ──────────────
-    try {
-      const r = await fetch(`${BASE}/v1/managers/store/products/`, { headers });
-      const t = await r.text();
-      results["GET /v1/managers/store/products/"] = { status: r.status, body: t.slice(0, 500) };
-    } catch (e) {
-      results["GET /v1/managers/store/products/"] = { error: String(e) };
-    }
-
-    // ── Test 3: POST /v1/managers/store/products/add (form-data, is_draft=1) ──
-    try {
-      const fd = new FormData();
-      fd.append("name[ar]", "منتج اختبار - يُحذف");
-      fd.append("name[en]", "DEBUG Test Product - delete me");
-      fd.append("price", "10");
-      fd.append("sku", sku);
-      fd.append("is_draft", "1");
-      fd.append("is_infinite", "1");
-      fd.append("unlimited_quantity", "1");
-      fd.append("quantity", "999");
-      fd.append("requires_shipping", "0");
-      fd.append("is_taxable", "0");
-
-      const r = await fetch(`${BASE}/v1/managers/store/products/add`, {
-        method: "POST",
-        headers,
-        body: fd,
+      const r = await fetch(`${BASE}/v1/managers/store/`, {
+        headers: {
+          "Authorization": `Bearer ${store.auth_token || ""}`,
+          "X-Manager-Token": store.access_token,
+          "Accept-Language": "en",
+        },
       });
       const t = await r.text();
-      results["POST /v1/managers/store/products/add (form-data)"] = { status: r.status, body: t.slice(0, 600) };
+      results["1_GET_store_info"] = { status: r.status, ok: r.ok, body: t.slice(0, 400) };
     } catch (e) {
-      results["POST /v1/managers/store/products/add (form-data)"] = { error: String(e) };
+      results["1_GET_store_info"] = { error: String(e) };
     }
 
-    // ── Test 4: POST /v1/managers/store/products/ (JSON) ─────────────────────
+    // ── Test 2: POST /v1/products/ (correct endpoint per docs) ────────────────
     try {
-      const r = await fetch(`${BASE}/v1/managers/store/products/`, {
-        method: "POST",
-        headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: "DEBUG Test Product 2",
-          name_ar: "منتج اختبار 2 - يُحذف",
-          name_en: "DEBUG Test Product 2 - delete me",
-          price: 10,
-          sku: `${sku}-b`,
-          is_draft: true,
-          is_infinite: true,
-          unlimited_quantity: true,
-          quantity: 999,
-          requires_shipping: false,
-          is_taxable: false,
-        }),
-      });
-      const t = await r.text();
-      results["POST /v1/managers/store/products/ (JSON)"] = { status: r.status, body: t.slice(0, 600) };
-    } catch (e) {
-      results["POST /v1/managers/store/products/ (JSON)"] = { error: String(e) };
-    }
+      const body = {
+        name: "DEBUG Test - delete me",
+        price: 10,
+        sku,
+        is_draft: true,
+        is_infinite: true,
+        quantity: 999,
+        requires_shipping: false,
+        is_taxable: false,
+      };
 
-    // ── Test 5: POST /v1/products/ (JSON) ────────────────────────────────────
-    try {
       const r = await fetch(`${BASE}/v1/products/`, {
         method: "POST",
-        headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: "DEBUG Test Product 3",
-          name_ar: "منتج اختبار 3 - يُحذف",
-          name_en: "DEBUG Test Product 3 - delete me",
-          price: 10,
-          sku: `${sku}-c`,
-          is_draft: true,
-          is_infinite: true,
-          unlimited_quantity: true,
-          quantity: 999,
-          requires_shipping: false,
-          is_taxable: false,
-        }),
+        headers,
+        body: JSON.stringify(body),
       });
       const t = await r.text();
-      results["POST /v1/products/ (JSON)"] = { status: r.status, body: t.slice(0, 600) };
+      results["2_POST_products_json"] = { status: r.status, ok: r.ok, body: t.slice(0, 600) };
     } catch (e) {
-      results["POST /v1/products/ (JSON)"] = { error: String(e) };
+      results["2_POST_products_json"] = { error: String(e) };
     }
 
-    return NextResponse.json({ storeInfo, results }, { status: 200 });
+    // ── Test 3: List products (verify read access) ────────────────────────────
+    try {
+      const r = await fetch(`${BASE}/v1/products/`, {
+        headers: {
+          "Authorization": `Bearer ${store.auth_token || ""}`,
+          "X-Manager-Token": store.access_token,
+          "Store-Id": store.store_id,
+          "Role": "Manager",
+          "Accept-Language": "en",
+        },
+      });
+      const t = await r.text();
+      results["3_GET_products_list"] = { status: r.status, ok: r.ok, body: t.slice(0, 400) };
+    } catch (e) {
+      results["3_GET_products_list"] = { error: String(e) };
+    }
+
+    return NextResponse.json({ storeInfo, results });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }
