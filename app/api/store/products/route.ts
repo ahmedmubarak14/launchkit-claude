@@ -104,9 +104,18 @@ export async function POST(request: NextRequest) {
           }
         } else {
           console.error("[products] Zid product creation failed:", res.status, text);
+          return NextResponse.json({
+            error: "Zid API rejected the product",
+            detail: `HTTP ${res.status}: ${text.slice(0, 500)}`
+          }, { status: res.status });
         }
       } catch (err) {
         console.error("[products] Zid fetch error:", err);
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        return NextResponse.json({
+          error: "Failed to reach Zid API",
+          detail: errorMsg
+        }, { status: 500 });
       }
     } else {
       console.log("[products] Missing store credentials — store_id:", store?.store_id, "access_token:", !!store?.access_token);
@@ -154,12 +163,14 @@ export async function POST(request: NextRequest) {
       error: store?.store_id
         ? "Failed to create product — check Zid API credentials"
         : "Store not connected (missing store_id). Visit /api/store/fix-store-id first.",
+      detail: "Product push to Zid failed. DB saving also failed.",
       pushedToZid: false,
       savedToDb: false,
     }, { status: 500 });
   } catch (error) {
     console.error("[products] API error:", error);
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    const msg = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: "Internal server error", detail: msg }, { status: 500 });
   }
 }
 

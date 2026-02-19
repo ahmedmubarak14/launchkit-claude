@@ -37,7 +37,7 @@ export function ProductCard({ action, sessionId, language, onConfirm }: ProductC
           setSelectedCategoryId(d.categories[0].id);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const selectedCat = zidCategories.find((c) => c.id === selectedCategoryId);
@@ -66,12 +66,13 @@ export function ProductCard({ action, sessionId, language, onConfirm }: ProductC
         onConfirm(result.product || data);
       } else {
         // Show error so user knows what happened
-        const msg = result.error || (language === "en" ? "Failed to add product" : "فشل إضافة المنتج");
+        const msg = result.detail || result.error || (language === "en" ? "Failed to add product" : "فشل إضافة المنتج");
         setError(msg);
         console.error("[ProductCard] product API error:", result);
       }
     } catch (err) {
-      setError(language === "en" ? "Network error — please try again" : "خطأ في الشبكة — حاول مجددًا");
+      const errMsg = err instanceof Error ? err.message : String(err);
+      setError(language === "en" ? `Network error: ${errMsg}` : `خطأ في الشبكة: ${errMsg}`);
       console.error("[ProductCard] fetch error:", err);
     } finally {
       setLoading(false);
