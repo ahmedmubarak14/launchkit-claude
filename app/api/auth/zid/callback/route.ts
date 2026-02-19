@@ -56,13 +56,16 @@ export async function GET(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    await adminSupabase.from("stores").upsert({
+    // Delete any existing store records for this user+platform to avoid duplicates
+    await adminSupabase.from("stores").delete().eq("user_id", userId).eq("platform", "zid");
+
+    await adminSupabase.from("stores").insert({
       user_id: userId,
       platform: "zid",
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token || null,
-      store_name: storeInfo?.store?.name || "My Zid Store",
-      store_id: storeInfo?.store?.id?.toString() || null,
+      store_name: storeInfo?.store?.name || storeInfo?.name || "My Zid Store",
+      store_id: storeInfo?.store?.id?.toString() || storeInfo?.id?.toString() || null,
     });
 
     const response = NextResponse.redirect(`${appUrl}/setup`);

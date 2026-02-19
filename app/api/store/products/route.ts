@@ -16,13 +16,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get user's Zid store access token
-    const { data: store } = await supabase
+    // Get user's Zid store access token (use limit 1 in case of duplicate rows)
+    const { data: storeRows } = await supabase
       .from("stores")
       .select("access_token, store_id")
       .eq("user_id", user.id)
       .eq("platform", "zid")
-      .single();
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const store = storeRows?.[0] || null;
 
     // Push product to Zid if store is connected
     let zidProductId: string | null = null;
