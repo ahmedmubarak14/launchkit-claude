@@ -42,16 +42,21 @@ export async function GET(request: NextRequest) {
     console.log("Zid token response keys:", Object.keys(tokens));
 
     // Get store info from Zid using the correct headers
-    const storeResponse = await fetch(`${process.env.ZID_API_BASE_URL}/v1/managers/account/profile`, {
-      headers: {
-        "Authorization": `Bearer ${tokens.Authorization}`,
-        "X-Manager-Token": tokens.access_token,
-        "Accept-Language": "ar",
-      },
-    });
-
-    const storeInfo = storeResponse.ok ? await storeResponse.json() : {};
-    console.log("Zid store info response:", storeResponse.status, JSON.stringify(storeInfo).substring(0, 200));
+    let storeInfo: Record<string, unknown> = {};
+    try {
+      const storeResponse = await fetch(`${process.env.ZID_API_BASE_URL}/v1/managers/account/profile`, {
+        headers: {
+          "Authorization": `Bearer ${tokens.Authorization}`,
+          "X-Manager-Token": tokens.access_token,
+          "Accept-Language": "ar",
+        },
+      });
+      const storeText = await storeResponse.text();
+      console.log("Zid store info response:", storeResponse.status, storeText.substring(0, 300));
+      if (storeResponse.ok) storeInfo = JSON.parse(storeText);
+    } catch (e) {
+      console.error("Zid store info fetch failed (non-critical):", e);
+    }
 
     // Use service role to bypass RLS — session cookie may be lost after OAuth redirect
     const adminSupabase = createAdminClient(
