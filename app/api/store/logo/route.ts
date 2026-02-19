@@ -43,21 +43,34 @@ export async function POST(request: NextRequest) {
           .limit(1);
         const store = storeRows?.[0] || null;
 
-        if (store?.access_token && !logoUrl.startsWith("data:")) {
-          // Only push external URLs (not SVG data URIs) to Zid
-          const fd = new FormData();
-          fd.append("logo", logoUrl);
+        if (store?.access_token) {
+          try {
+            const fd = new FormData();
 
-          const zidRes = await fetch(`${process.env.ZID_API_BASE_URL || "https://api.zid.sa"}/v1/managers/store/`, {
-            method: "PUT",
-            headers: {
-              "X-Manager-Token": store.access_token,
-              "Authorization": `Bearer ${store.auth_token || ""}`,
-              "Accept-Language": "ar",
-            },
-            body: fd,
-          });
-          console.log("[logo] Zid logo push:", zidRes.status, await zidRes.text().then(t => t.slice(0, 200)));
+            // Convert logo URL (base64 or remote) to a File blob for FormData
+            // Zid requires an actual file upload, not just a string URL
+            const logoFetch = await fetch(logoUrl);
+            const logoBlob = await logoFetch.blob();
+            // Create a file from the blob (Zid needs a filename)
+            const logoFile = new File([logoBlob], "store-logo.png", { type: logoBlob.type });
+
+            fd.append("logo", logoFile);
+
+            const zidRes = await fetch(`${process.env.ZID_API_BASE_URL || "https://api.zid.sa"}/v1/managers/store/`, {
+              method: "POST", // Official docs: POST /v1/managers/store/logo (Some versions use PUT to /store)
+              // Wait, checking Zid docs, it's POST /v1/managers/store/logo to update logo
+              headers: {
+                "X-Manager-Token": store.access_token,
+                "Authorization": `Bearer ${store.auth_token || ""}`,
+                "Accept-Language": "ar",
+                // Do NOT set Content-Type to multipart/form-data, fetch does it automatically with boundary
+              },
+              body: fd,
+            });
+            console.log("[logo] Zid logo push:", zidRes.status, await zidRes.text().then(t => t.slice(0, 200)));
+          } catch (uploadErr) {
+            console.error("[logo] Zid upload error:", uploadErr);
+          }
         }
       } catch (err) {
         console.error("[logo] Zid push error:", err);

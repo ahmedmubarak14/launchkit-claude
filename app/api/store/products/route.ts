@@ -71,6 +71,7 @@ export async function POST(request: NextRequest) {
         },
         price: Number(product.price) || 0,
         sku,
+        is_published: true, // Make visible on storefront
         is_draft: false,
         is_infinite: true,
         quantity: 999,
