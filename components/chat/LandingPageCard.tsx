@@ -15,6 +15,9 @@ import {
   Sparkles,
   Gift,
   Tag,
+  Zap,
+  RefreshCw,
+  Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AIAction } from "@/types";
@@ -72,6 +75,8 @@ interface LandingPageData {
   seoDescription?: string;
 }
 
+type ApplyStatus = "idle" | "applying" | "success" | "error" | "fallback";
+
 function getFeatureIcon(iconName: string, color: string) {
   const cls = "w-4 h-4";
   const style = { color };
@@ -109,11 +114,12 @@ function CopyButton({ text, label }: { text: string; label: string }) {
 }
 
 export function LandingPageCard({ action, language, onConfirm }: LandingPageCardProps) {
-  const [confirmed, setConfirmed] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [applyStatus, setApplyStatus] = useState<ApplyStatus>("idle");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [storeUrl, setStoreUrl] = useState<string | null>(null);
   const [storeBuilderUrl, setStoreBuilderUrl] = useState<string | null>(null);
   const [showSections, setShowSections] = useState(false);
+  const [isApplied, setIsApplied] = useState(false);
 
   const isRTL = language === "ar";
   const data = (action.data as unknown as LandingPageData) || {};
@@ -142,23 +148,59 @@ export function LandingPageCard({ action, language, onConfirm }: LandingPageCard
       .catch(() => {});
   }, []);
 
-  const handleApply = async () => {
-    setLoading(true);
-    setError(null);
+  /** Push the generated layout to the Zid storefront via App Scripts */
+  const handleApplyToStore = async () => {
+    setApplyStatus("applying");
+    setErrorMsg(null);
     try {
-      const res = await fetch("/api/store/landing-page", {
+      const res = await fetch("/api/store/landing-page/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ layout: data }),
       });
       const result = await res.json();
-      if (result.storeBuilderUrl) setStoreBuilderUrl(result.storeBuilderUrl);
-      setConfirmed(true);
-      onConfirm(data);
+
+      if (res.ok && result.success) {
+        if (result.storeUrl) setStoreUrl(result.storeUrl);
+        if (result.storeBuilderUrl) setStoreBuilderUrl(result.storeBuilderUrl);
+        setApplyStatus("success");
+        setIsApplied(true);
+        onConfirm(data);
+      } else if (res.status === 422 && result.fallback) {
+        // Zid script API not available — still show partial success
+        if (result.storeBuilderUrl) setStoreBuilderUrl(result.storeBuilderUrl);
+        setApplyStatus("fallback");
+        setIsApplied(true);
+        onConfirm(data);
+        setErrorMsg(
+          language === "en"
+            ? "App Scripts API not enabled on this store. Use the builder link below to apply manually."
+            : "واجهة App Scripts غير مفعّلة على هذا المتجر. استخدم رابط المنشئ أدناه للتطبيق اليدوي."
+        );
+      } else {
+        setApplyStatus("error");
+        setErrorMsg(
+          language === "en"
+            ? (result.detail || result.error || "Failed to apply to store")
+            : "فشل تطبيق التصميم على المتجر"
+        );
+      }
+    } catch (err) {
+      setApplyStatus("error");
+      setErrorMsg(language === "en" ? "Network error, please try again." : "خطأ في الشبكة، يرجى المحاولة مرة أخرى.");
+    }
+  };
+
+  /** Remove the script from the store */
+  const handleRemoveFromStore = async () => {
+    setApplyStatus("applying");
+    try {
+      await fetch("/api/store/landing-page/apply", { method: "DELETE" });
+      setApplyStatus("idle");
+      setIsApplied(false);
+      setStoreUrl(null);
     } catch {
-      setError(language === "en" ? "Failed to save layout" : "فشل في حفظ التخطيط");
-    } finally {
-      setLoading(false);
+      setApplyStatus("idle");
     }
   };
 
@@ -166,7 +208,6 @@ export function LandingPageCard({ action, language, onConfirm }: LandingPageCard
   const buildCopyText = () => {
     const lines: string[] = [];
     lines.push(`=== ${storeName} — Landing Page Content ===\n`);
-
     lines.push("--- HERO SECTION ---");
     lines.push(`Headline (EN): ${hero.headline}`);
     if (hero.headlineAr) lines.push(`Headline (AR): ${hero.headlineAr}`);
@@ -174,14 +215,12 @@ export function LandingPageCard({ action, language, onConfirm }: LandingPageCard
     if (hero.subheadlineAr) lines.push(`Subheadline (AR): ${hero.subheadlineAr}`);
     lines.push(`CTA Button (EN): ${hero.cta}`);
     if (hero.ctaAr) lines.push(`CTA Button (AR): ${hero.ctaAr}`);
-
     if (features.length > 0) {
       lines.push("\n--- FEATURES / TRUST BADGES ---");
       features.forEach((f, i) => {
         lines.push(`${i + 1}. ${f.title}${f.titleAr ? ` / ${f.titleAr}` : ""}: ${f.description}${f.descriptionAr ? ` / ${f.descriptionAr}` : ""}`);
       });
     }
-
     if (promo) {
       lines.push("\n--- PROMO BANNER ---");
       lines.push(`Headline (EN): ${promo.headline}`);
@@ -189,7 +228,6 @@ export function LandingPageCard({ action, language, onConfirm }: LandingPageCard
       if (promo.discount) lines.push(`Discount: ${promo.discount}`);
       if (promo.code) lines.push(`Coupon Code: ${promo.code}`);
     }
-
     if (testimonials.length > 0) {
       lines.push("\n--- TESTIMONIALS ---");
       testimonials.forEach((t, i) => {
@@ -197,61 +235,89 @@ export function LandingPageCard({ action, language, onConfirm }: LandingPageCard
         if (t.quoteAr) lines.push(`   AR: "${t.quoteAr}"`);
       });
     }
-
     if (data.seoTitle) {
       lines.push("\n--- SEO ---");
       lines.push(`Title: ${data.seoTitle}`);
       if (data.seoDescription) lines.push(`Description: ${data.seoDescription}`);
     }
-
     return lines.join("\n");
   };
 
-  if (confirmed) {
+  // ── Applied / Success state ──────────────────────────────────────────────────
+  if (applyStatus === "success" || (isApplied && applyStatus === "idle")) {
     return (
-      <div
-        className="bg-gradient-to-r from-emerald-50 to-emerald-50/50 border border-emerald-200 rounded-2xl p-4 space-y-3 shadow-sm"
-        dir={isRTL ? "rtl" : "ltr"}
-      >
+      <div className="bg-gradient-to-r from-emerald-50 to-emerald-50/50 border border-emerald-200 rounded-2xl p-4 space-y-3 shadow-sm" dir={isRTL ? "rtl" : "ltr"}>
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-emerald-100 border border-emerald-200 flex items-center justify-center flex-shrink-0">
-            <Check className="w-4 h-4 text-emerald-600" />
+            <Globe className="w-4 h-4 text-emerald-600" />
           </div>
           <div>
             <p className="text-sm font-semibold text-emerald-700">
-              {language === "en" ? "Landing Page Layout Saved!" : "تم حفظ تخطيط الصفحة الرئيسية!"}
+              {language === "en" ? "Landing Page is LIVE on your store! 🎉" : "الصفحة الرئيسية مباشرة على متجرك الآن! 🎉"}
             </p>
             <p className="text-xs text-emerald-500 mt-0.5">
-              {language === "en"
-                ? "Apply the content in your Zid Store Builder"
-                : "طبّق المحتوى في منشئ متجر زد"}
+              {language === "en" ? "Visitors will see your new homepage section automatically." : "سيرى الزوار قسم الصفحة الرئيسية الجديد تلقائياً."}
             </p>
           </div>
         </div>
-
         <div className="flex flex-col gap-2">
-          {storeBuilderUrl && (
+          {storeUrl && (
             <a
-              href={storeBuilderUrl}
+              href={storeUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl px-4 py-2.5 transition-all"
             >
               <ExternalLink className="w-3.5 h-3.5" />
-              {language === "en" ? "Open Zid Store Builder" : "افتح منشئ متجر زد"}
+              {language === "en" ? "View Live Store" : "عرض المتجر المباشر"}
             </a>
           )}
-          <CopyButton text={buildCopyText()} label={language === "en" ? "Copy all content" : "نسخ كل المحتوى"} />
+          <button
+            onClick={handleRemoveFromStore}
+            className="w-full flex items-center justify-center gap-2 border border-red-200 bg-red-50 text-red-600 text-xs font-medium rounded-xl px-4 py-2 hover:bg-red-100 transition-all"
+          >
+            <RefreshCw className="w-3 h-3" />
+            {language === "en" ? "Remove landing page from store" : "إزالة الصفحة الرئيسية من المتجر"}
+          </button>
         </div>
       </div>
     );
   }
 
+  // ── Fallback state (script API unavailable) ──────────────────────────────────
+  if (applyStatus === "fallback") {
+    return (
+      <div className="bg-gradient-to-r from-amber-50 to-amber-50/50 border border-amber-200 rounded-2xl p-4 space-y-3 shadow-sm" dir={isRTL ? "rtl" : "ltr"}>
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-amber-100 border border-amber-200 flex items-center justify-center flex-shrink-0">
+            <Check className="w-4 h-4 text-amber-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-amber-700">
+              {language === "en" ? "Layout saved — manual apply needed" : "تم حفظ التخطيط — يلزم التطبيق اليدوي"}
+            </p>
+            {errorMsg && <p className="text-xs text-amber-600 mt-0.5">{errorMsg}</p>}
+          </div>
+        </div>
+        {storeBuilderUrl && (
+          <a
+            href={storeBuilderUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-xl px-4 py-2.5 transition-all"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            {language === "en" ? "Open Zid Store Builder" : "افتح منشئ متجر زد"}
+          </a>
+        )}
+        <CopyButton text={buildCopyText()} label={language === "en" ? "Copy all content" : "نسخ كل المحتوى"} />
+      </div>
+    );
+  }
+
+  // ── Main preview card ────────────────────────────────────────────────────────
   return (
-    <div
-      className="bg-white border border-gray-100 rounded-2xl shadow-md overflow-hidden"
-      dir={isRTL ? "rtl" : "ltr"}
-    >
+    <div className="bg-white border border-gray-100 rounded-2xl shadow-md overflow-hidden" dir={isRTL ? "rtl" : "ltr"}>
       {/* Header */}
       <div className="px-4 pt-4 pb-3 flex items-center gap-2 border-b border-gray-50">
         <div className="w-8 h-8 rounded-lg bg-violet-100 border border-violet-200 flex items-center justify-center flex-shrink-0">
@@ -267,10 +333,15 @@ export function LandingPageCard({ action, language, onConfirm }: LandingPageCard
             {storeName}
           </span>
         </div>
+        {/* Live badge */}
+        <span className="flex items-center gap-1 text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+          <Zap className="w-2.5 h-2.5" />
+          {language === "en" ? "Auto-apply" : "تطبيق تلقائي"}
+        </span>
       </div>
 
       {/* Browser Mockup */}
-      <div className="rounded-none border-b border-gray-100 overflow-hidden bg-gray-50/50">
+      <div className="border-b border-gray-100 overflow-hidden bg-gray-50/50">
         {/* Browser Chrome */}
         <div className="bg-gray-100/80 px-3 py-2 border-b border-gray-200 flex items-center gap-1.5" dir="ltr">
           <div className="flex gap-1">
@@ -284,16 +355,14 @@ export function LandingPageCard({ action, language, onConfirm }: LandingPageCard
         </div>
 
         {/* Page Content */}
-        <div className="max-h-[420px] overflow-y-auto">
+        <div className="max-h-[400px] overflow-y-auto">
           {/* Hero */}
           <div
             className="px-6 py-10 flex flex-col items-center justify-center text-center text-white relative overflow-hidden"
             style={{ backgroundColor: primaryColor }}
           >
-            {/* decorative circles */}
             <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full opacity-10 bg-white" />
             <div className="absolute -bottom-4 -left-4 w-16 h-16 rounded-full opacity-10 bg-white" />
-
             <h1 className="text-lg font-extrabold mb-1.5 tracking-tight relative z-10">
               {isRTL && hero.headlineAr ? hero.headlineAr : hero.headline}
             </h1>
@@ -301,7 +370,7 @@ export function LandingPageCard({ action, language, onConfirm }: LandingPageCard
               {isRTL && hero.subheadlineAr ? hero.subheadlineAr : hero.subheadline}
             </p>
             <button
-              className="bg-white text-gray-900 px-5 py-1.5 rounded-full text-[10px] font-bold shadow-sm flex items-center gap-1 relative z-10"
+              className="bg-white px-5 py-1.5 rounded-full text-[10px] font-bold shadow-sm flex items-center gap-1 relative z-10"
               style={{ color: primaryColor }}
             >
               {isRTL && hero.ctaAr ? hero.ctaAr : hero.cta}
@@ -312,18 +381,16 @@ export function LandingPageCard({ action, language, onConfirm }: LandingPageCard
           {/* Promo Banner */}
           {promo && (
             <div
-              className="px-4 py-3 flex items-center justify-between text-white text-[10px]"
+              className="px-4 py-2.5 flex items-center justify-between text-white text-[10px] flex-wrap gap-2"
               style={{ backgroundColor: `${primaryColor}dd` }}
             >
               <span className="font-bold">{isRTL && promo.headlineAr ? promo.headlineAr : promo.headline}</span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 {promo.discount && (
                   <span className="bg-white/20 rounded-full px-2 py-0.5 font-semibold">{promo.discount}</span>
                 )}
                 {promo.code && (
-                  <span className="bg-white text-gray-800 rounded-full px-2 py-0.5 font-mono font-bold">
-                    {promo.code}
-                  </span>
+                  <span className="bg-white text-gray-800 rounded-md px-2 py-0.5 font-mono font-bold">{promo.code}</span>
                 )}
               </div>
             </div>
@@ -331,17 +398,11 @@ export function LandingPageCard({ action, language, onConfirm }: LandingPageCard
 
           {/* Features */}
           {features.length > 0 && (
-            <div className="py-5 px-4 bg-white">
+            <div className="py-4 px-4 bg-white">
               <div className="grid grid-cols-2 gap-2">
                 {features.map((f, i) => (
-                  <div
-                    key={i}
-                    className="flex flex-col items-center text-center p-3 rounded-xl border border-gray-100 bg-gray-50/60"
-                  >
-                    <div
-                      className="w-7 h-7 rounded-full mb-1.5 flex items-center justify-center"
-                      style={{ backgroundColor: `${primaryColor}18` }}
-                    >
+                  <div key={i} className="flex flex-col items-center text-center p-2.5 rounded-xl border border-gray-100 bg-gray-50/60">
+                    <div className="w-7 h-7 rounded-full mb-1.5 flex items-center justify-center" style={{ backgroundColor: `${primaryColor}18` }}>
                       {getFeatureIcon(f.icon, primaryColor)}
                     </div>
                     <h3 className="text-[10px] font-bold text-gray-800">
@@ -358,17 +419,10 @@ export function LandingPageCard({ action, language, onConfirm }: LandingPageCard
 
           {/* Categories strip */}
           {data.categories && data.categories.length > 0 && (
-            <div className="px-4 py-4 bg-gray-50 border-t border-gray-100">
-              <p className="text-[9px] text-gray-400 uppercase tracking-widest font-semibold mb-2 text-center">
-                {language === "en" ? "Shop by Category" : "تسوق حسب الفئة"}
-              </p>
+            <div className="px-4 py-3 bg-gray-50 border-t border-gray-100">
               <div className="flex flex-wrap justify-center gap-1.5">
                 {data.categories.map((c, i) => (
-                  <span
-                    key={i}
-                    className="text-[9px] font-semibold px-2.5 py-1 rounded-full text-white"
-                    style={{ backgroundColor: primaryColor }}
-                  >
+                  <span key={i} className="text-[9px] font-semibold px-2.5 py-1 rounded-full text-white" style={{ backgroundColor: primaryColor }}>
                     {isRTL && c.nameAr ? c.nameAr : c.name}
                   </span>
                 ))}
@@ -379,15 +433,9 @@ export function LandingPageCard({ action, language, onConfirm }: LandingPageCard
           {/* Testimonials */}
           {testimonials.length > 0 && (
             <div className="py-4 px-4 bg-white border-t border-gray-100">
-              <p className="text-[9px] text-gray-400 uppercase tracking-widest font-semibold mb-2 text-center">
-                {language === "en" ? "Customer Reviews" : "آراء العملاء"}
-              </p>
               <div className="flex flex-col gap-2">
                 {testimonials.map((t, i) => (
-                  <div
-                    key={i}
-                    className="bg-gray-50 p-2.5 rounded-xl border border-gray-100"
-                  >
+                  <div key={i} className="bg-gray-50 p-2.5 rounded-xl border border-gray-100">
                     <div className="flex text-amber-400 mb-1">
                       {[...Array(t.rating || 5)].map((_, j) => (
                         <Star key={j} className="w-2.5 h-2.5 fill-current" />
@@ -400,16 +448,6 @@ export function LandingPageCard({ action, language, onConfirm }: LandingPageCard
                   </div>
                 ))}
               </div>
-            </div>
-          )}
-
-          {/* SEO footer */}
-          {data.seoTitle && (
-            <div className="py-3 px-4 bg-gray-100 border-t border-gray-200 text-center">
-              <p className="text-[9px] text-gray-500 font-medium">{data.seoTitle}</p>
-              {data.seoDescription && (
-                <p className="text-[8px] text-gray-400 mt-0.5 leading-snug">{data.seoDescription}</p>
-              )}
             </div>
           )}
         </div>
@@ -428,27 +466,21 @@ export function LandingPageCard({ action, language, onConfirm }: LandingPageCard
         </button>
 
         {showSections && (
-          <div className="mt-3 space-y-2.5" dir={isRTL ? "rtl" : "ltr"}>
-            {/* Hero content */}
+          <div className="mt-3 space-y-2.5">
+            {/* Hero */}
             <div className="bg-gray-50 rounded-xl p-3 space-y-1.5">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">
                   {language === "en" ? "Hero Section" : "قسم الهيرو"}
                 </span>
-                <CopyButton
-                  text={`${hero.headline}\n${hero.subheadline}\n${hero.cta}`}
-                  label={language === "en" ? "Copy" : "نسخ"}
-                />
+                <CopyButton text={`${hero.headline}\n${hero.subheadline}\n${hero.cta}`} label={language === "en" ? "Copy" : "نسخ"} />
               </div>
               <p className="text-xs font-bold text-gray-800">{hero.headline}</p>
               {hero.headlineAr && <p className="text-xs font-bold text-gray-600" dir="rtl">{hero.headlineAr}</p>}
               <p className="text-[11px] text-gray-500">{hero.subheadline}</p>
               {hero.subheadlineAr && <p className="text-[11px] text-gray-400" dir="rtl">{hero.subheadlineAr}</p>}
-              <span
-                className="inline-block text-[10px] font-semibold px-3 py-1 rounded-full text-white"
-                style={{ backgroundColor: primaryColor }}
-              >
-                {hero.cta} {hero.ctaAr && `/ ${hero.ctaAr}`}
+              <span className="inline-block text-[10px] font-semibold px-3 py-1 rounded-full text-white" style={{ backgroundColor: primaryColor }}>
+                {hero.cta}{hero.ctaAr && ` / ${hero.ctaAr}`}
               </span>
             </div>
 
@@ -457,12 +489,9 @@ export function LandingPageCard({ action, language, onConfirm }: LandingPageCard
               <div className="bg-gray-50 rounded-xl p-3 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">
-                    {language === "en" ? "Features / Trust Badges" : "المميزات / شارات الثقة"}
+                    {language === "en" ? "Trust Badges" : "شارات الثقة"}
                   </span>
-                  <CopyButton
-                    text={features.map((f) => `• ${f.title}: ${f.description}`).join("\n")}
-                    label={language === "en" ? "Copy" : "نسخ"}
-                  />
+                  <CopyButton text={features.map((f) => `• ${f.title}: ${f.description}`).join("\n")} label={language === "en" ? "Copy" : "نسخ"} />
                 </div>
                 {features.map((f, i) => (
                   <div key={i} className="text-[11px] text-gray-700">
@@ -487,17 +516,11 @@ export function LandingPageCard({ action, language, onConfirm }: LandingPageCard
                   />
                 </div>
                 <p className="text-xs font-bold text-gray-800">{promo.headline}</p>
-                {promo.headlineAr && <p className="text-xs font-bold text-gray-600" dir="rtl">{promo.headlineAr}</p>}
-                {promo.discount && (
-                  <span className="text-[10px] font-bold text-white rounded-full px-2.5 py-0.5 inline-block" style={{ backgroundColor: primaryColor }}>
-                    {promo.discount}
-                  </span>
-                )}
-                {promo.code && (
-                  <span className="text-[10px] font-mono font-bold bg-gray-200 text-gray-800 rounded-lg px-2 py-0.5 ml-2 inline-block">
-                    {promo.code}
-                  </span>
-                )}
+                {promo.headlineAr && <p className="text-xs text-gray-500" dir="rtl">{promo.headlineAr}</p>}
+                <div className="flex items-center gap-2">
+                  {promo.discount && <span className="text-[10px] font-bold text-white rounded-full px-2.5 py-0.5 inline-block" style={{ backgroundColor: primaryColor }}>{promo.discount}</span>}
+                  {promo.code && <code className="text-[10px] font-mono font-bold bg-gray-200 text-gray-800 rounded-lg px-2 py-0.5">{promo.code}</code>}
+                </div>
               </div>
             )}
 
@@ -508,15 +531,11 @@ export function LandingPageCard({ action, language, onConfirm }: LandingPageCard
                   <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">
                     {language === "en" ? "Testimonials" : "الشهادات"}
                   </span>
-                  <CopyButton
-                    text={testimonials.map((t) => `"${t.quote}" — ${t.author}`).join("\n")}
-                    label={language === "en" ? "Copy" : "نسخ"}
-                  />
+                  <CopyButton text={testimonials.map((t) => `"${t.quote}" — ${t.author}`).join("\n")} label={language === "en" ? "Copy" : "نسخ"} />
                 </div>
                 {testimonials.map((t, i) => (
                   <div key={i} className="text-[11px] text-gray-600 italic">
                     "{t.quote}"<span className="font-semibold not-italic text-gray-800"> — {t.author}</span>
-                    {t.quoteAr && <div className="text-gray-400" dir="rtl">"{t.quoteAr}"</div>}
                   </div>
                 ))}
               </div>
@@ -527,10 +546,7 @@ export function LandingPageCard({ action, language, onConfirm }: LandingPageCard
               <div className="bg-gray-50 rounded-xl p-3 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">SEO</span>
-                  <CopyButton
-                    text={`Title: ${data.seoTitle}\nDescription: ${data.seoDescription}`}
-                    label={language === "en" ? "Copy" : "نسخ"}
-                  />
+                  <CopyButton text={`Title: ${data.seoTitle}\nDescription: ${data.seoDescription}`} label={language === "en" ? "Copy" : "نسخ"} />
                 </div>
                 {data.seoTitle && <p className="text-xs font-semibold text-blue-700">{data.seoTitle}</p>}
                 {data.seoDescription && <p className="text-[11px] text-gray-500">{data.seoDescription}</p>}
@@ -540,28 +556,50 @@ export function LandingPageCard({ action, language, onConfirm }: LandingPageCard
         )}
       </div>
 
-      {/* Action buttons */}
+      {/* Action Buttons */}
       <div className="p-4 space-y-2.5">
-        {error && (
-          <p className="text-xs text-red-500 font-medium text-center">{error}</p>
+        {/* Error message */}
+        {applyStatus === "error" && errorMsg && (
+          <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-xs text-red-600 font-medium">
+            {errorMsg}
+          </div>
         )}
 
-        {/* Primary: Apply & Save */}
+        {/* PRIMARY — Apply to Live Store */}
         <Button
-          onClick={handleApply}
-          disabled={loading}
-          className="w-full text-white text-sm font-semibold rounded-xl px-5 py-2.5 shadow-md transition-all hover:-translate-y-0.5 disabled:opacity-60"
+          onClick={handleApplyToStore}
+          disabled={applyStatus === "applying"}
+          className="w-full text-white text-sm font-bold rounded-xl px-5 py-3 shadow-md transition-all hover:-translate-y-0.5 disabled:opacity-60"
           style={{ backgroundColor: primaryColor }}
         >
-          {loading ? (
-            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+          {applyStatus === "applying" ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+              {language === "en" ? "Applying to store..." : "جاري التطبيق على المتجر..."}
+            </>
           ) : (
-            <Check className="w-4 h-4 mr-1.5" />
+            <>
+              <Zap className="w-4 h-4 mr-1.5" />
+              {language === "en" ? "Apply to Live Store" : "تطبيق على المتجر المباشر"}
+            </>
           )}
-          {language === "en" ? "Save & Approve Layout" : "حفظ واعتماد التخطيط"}
         </Button>
 
-        {/* Secondary: Open Zid Store Builder */}
+        {/* Helper text */}
+        <p className="text-[10px] text-gray-400 text-center leading-relaxed">
+          {language === "en"
+            ? "This will inject the landing page section into your live Zid store homepage automatically."
+            : "سيضيف هذا قسم الصفحة الرئيسية إلى متجرك على زد تلقائياً."}
+        </p>
+
+        {/* Divider */}
+        <div className="flex items-center gap-2">
+          <div className="flex-1 border-t border-gray-100" />
+          <span className="text-[10px] text-gray-300 font-medium">{language === "en" ? "or" : "أو"}</span>
+          <div className="flex-1 border-t border-gray-100" />
+        </div>
+
+        {/* Secondary: Open Store Builder */}
         {storeBuilderUrl && (
           <a
             href={storeBuilderUrl}
@@ -570,23 +608,14 @@ export function LandingPageCard({ action, language, onConfirm }: LandingPageCard
             className="w-full flex items-center justify-center gap-2 border border-violet-200 bg-violet-50 text-violet-700 text-xs font-medium rounded-xl px-4 py-2 hover:bg-violet-100 transition-all"
           >
             <ExternalLink className="w-3.5 h-3.5" />
-            {language === "en" ? "Open Zid Store Builder to apply" : "افتح منشئ متجر زد لتطبيق التصميم"}
+            {language === "en" ? "Apply manually in Zid Store Builder" : "تطبيق يدوي في منشئ متجر زد"}
           </a>
         )}
 
         {/* Copy all */}
         <div className="flex justify-center">
-          <CopyButton
-            text={buildCopyText()}
-            label={language === "en" ? "Copy all content to clipboard" : "نسخ كل المحتوى"}
-          />
+          <CopyButton text={buildCopyText()} label={language === "en" ? "Copy all content to clipboard" : "نسخ كل المحتوى"} />
         </div>
-
-        <p className="text-[10px] text-gray-400 text-center leading-relaxed">
-          {language === "en"
-            ? "Save your layout, then paste the content into your Zid Store Builder sections."
-            : "احفظ التخطيط، ثم الصق المحتوى في أقسام منشئ متجر زد."}
-        </p>
       </div>
     </div>
   );
