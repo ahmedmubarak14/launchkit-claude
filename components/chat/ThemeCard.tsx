@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-
+import { useState, useEffect } from "react";
 import { ExternalLink, Palette, Sparkles, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AIAction } from "@/types";
@@ -10,12 +9,28 @@ interface ThemeCardProps {
   action: AIAction;
   sessionId: string;
   language: "en" | "ar";
-  onConfirm: (data: any) => void;
+  onConfirm: (data: unknown) => void;
 }
 
-export function ThemeCard({ language, onConfirm }: ThemeCardProps) {
+export function ThemeCard({ sessionId, language, onConfirm }: ThemeCardProps) {
   const [confirmed, setConfirmed] = useState(false);
+  const [storeId, setStoreId] = useState<string | null>(null);
   const isRTL = language === "ar";
+
+  // Fetch the real store_id so we can build the correct dashboard URL
+  useEffect(() => {
+    fetch("/api/store/debug")
+      .then((r) => r.json())
+      .then((d) => {
+        const id = d.store?.store_id || d.store_id || null;
+        if (id) setStoreId(String(id));
+      })
+      .catch(() => {});
+  }, [sessionId]);
+
+  const themeUrl = storeId
+    ? `https://dashboard.zid.sa/ar-sa/stores/${storeId}/channels/online-store/themes`
+    : "https://dashboard.zid.sa";
 
   const handleConfirm = () => {
     setConfirmed(true);
@@ -54,15 +69,14 @@ export function ThemeCard({ language, onConfirm }: ThemeCardProps) {
 
       <p className="text-sm text-gray-600 leading-relaxed">
         {language === "en"
-          ? "Professional, high-converting store themes are managed directly through the official Zid Theme Market. Explore dozens of free and premium designs tailored for your business."
-          : "تتم إدارة ثيمات المتاجر الاحترافية عالية التحويل مباشرة من خلال سوق ثيمات زد الرسمي. استكشف العشرات من التصميمات المجانية والمميزة المصممة خصيصًا لعملك."}
+          ? "Professional, high-converting store themes are managed directly through the Zid dashboard. Pick a design that fits your brand."
+          : "تتم إدارة ثيمات المتاجر الاحترافية مباشرةً من لوحة تحكم زد. اختر تصميمًا يناسب علامتك التجارية."}
       </p>
 
       {/* Action Buttons */}
       <div className="flex flex-col gap-2.5 pt-2">
-        {/* Primary: go directly to the theme-selection page inside the Zid merchant dashboard */}
         <a
-          href="https://web.zid.sa/settings/theme"
+          href={themeUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-700 hover:to-violet-800 text-white text-sm font-semibold rounded-xl px-5 py-3 shadow-md shadow-violet-200/60 transition-all hover:-translate-y-0.5"
@@ -72,7 +86,7 @@ export function ThemeCard({ language, onConfirm }: ThemeCardProps) {
           <ExternalLink className="w-3.5 h-3.5 ml-1 opacity-80" />
         </a>
 
-<Button
+        <Button
           onClick={handleConfirm}
           variant="outline"
           className="w-full text-sm font-medium rounded-xl border-gray-200 text-gray-600 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700 py-3"

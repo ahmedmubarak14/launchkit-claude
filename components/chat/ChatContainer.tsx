@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useAppStore } from "@/store/useStore";
-import { ChatMessage, AIAction, StoreTheme, BulkProductItem, ZidCategory } from "@/types";
+import { ChatMessage, AIAction, BulkProductItem, ZidCategory } from "@/types";
 import { MessageBubble, TypingIndicator } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
 
@@ -28,7 +28,7 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
     addCategory,
     products,
     addProduct,
-    setSelectedTheme,
+
     setLogoUrl,
   } = useAppStore();
 
@@ -274,14 +274,14 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
     );
   };
 
-  const handleThemeConfirm = (theme: StoreTheme) => {
-    setSelectedTheme(theme);
+  const handleThemeConfirm = (_data: unknown) => {
+    // Theme is now chosen externally via Zid dashboard — no theme object passed back
     setCompletionPercentage(88);
     setTimeout(() => {
       handleSend(
         language === "en"
-          ? `I applied the "${theme.nameEn}" theme. Now let's create a logo!`
-          : `تم تطبيق ثيم "${theme.nameAr}". الآن لننشئ الشعار!`
+          ? "Theme chosen! Now let's create a logo for your store."
+          : "تم اختيار الثيم! الآن لننشئ شعارًا لمتجرك."
       );
     }, 500);
   };

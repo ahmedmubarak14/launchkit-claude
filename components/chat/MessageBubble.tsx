@@ -2,7 +2,7 @@
 
 import { formatDistanceToNow } from "date-fns";
 import { Sparkles } from "lucide-react";
-import { ChatMessage, StoreTheme, BulkProductItem } from "@/types";
+import { ChatMessage, BulkProductItem } from "@/types";
 import { CategoryCard } from "./CategoryCard";
 import { ProductCard } from "./ProductCard";
 import { CouponCard, CouponData } from "./CouponCard";
@@ -17,7 +17,7 @@ interface MessageBubbleProps {
   language: "en" | "ar";
   onCategoryConfirm: (categories: Array<{ nameAr: string; nameEn: string }>) => void;
   onProductConfirm: (product: unknown) => void;
-  onThemeConfirm: (theme: StoreTheme) => void;
+  onThemeConfirm: (data: unknown) => void;
   onLogoConfirm: (logoUrl: string) => void;
   onBulkProductsConfirm: (products: BulkProductItem[]) => void;
   onLandingPageConfirm?: (data: any) => void;
