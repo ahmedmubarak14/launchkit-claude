@@ -60,15 +60,28 @@ export function ThemeCard({ language, onConfirm }: ThemeCardProps) {
 
       {/* Action Buttons */}
       <div className="flex flex-col gap-2.5 pt-2">
+        {/* Primary: go directly to the theme-selection page inside the Zid merchant dashboard */}
         <a
-          href="https://apps.zid.sa/themes"
+          href="https://web.zid.sa/settings/theme"
           target="_blank"
           rel="noopener noreferrer"
           className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-700 hover:to-violet-800 text-white text-sm font-semibold rounded-xl px-5 py-3 shadow-md shadow-violet-200/60 transition-all hover:-translate-y-0.5"
         >
           <Sparkles className="w-4 h-4" />
-          {language === "en" ? "Browse Zid Theme Market" : "تصفح سوق ثيمات زد"}
+          {language === "en" ? "Choose Theme in Zid Dashboard" : "اختر الثيم من لوحة تحكم زد"}
           <ExternalLink className="w-3.5 h-3.5 ml-1 opacity-80" />
+        </a>
+
+        {/* Secondary: browse the theme marketplace for new themes to install */}
+        <a
+          href="https://apps.zid.sa/themes"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full flex items-center justify-center gap-2 border border-violet-200 bg-violet-50 text-violet-700 text-sm font-medium rounded-xl px-5 py-2.5 hover:bg-violet-100 transition-all"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          {language === "en" ? "Browse Theme Market (install new)" : "تصفح سوق الثيمات (تثبيت جديد)"}
+          <ExternalLink className="w-3 h-3 ml-1 opacity-70" />
         </a>
 
         <Button
@@ -76,7 +89,7 @@ export function ThemeCard({ language, onConfirm }: ThemeCardProps) {
           variant="outline"
           className="w-full text-sm font-medium rounded-xl border-gray-200 text-gray-600 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700 py-3"
         >
-          {language === "en" ? "I've chosen my theme (Continue)" : "لقد اخترت الثيم (متابعة)"}
+          {language === "en" ? "I've chosen my theme ✓ Continue" : "لقد اخترت الثيم ✓ متابعة"}
         </Button>
       </div>
     </div>
