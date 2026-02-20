@@ -119,7 +119,9 @@ export interface AIAction {
   | "suggest_themes"
   | "generate_logo"
   | "bulk_products"
-  | "generate_landing_page";
+  | "generate_landing_page"
+  | "delete_category"
+  | "delete_product";
   data?: {
     // Existing
     categories?: Array<{ nameAr: string; nameEn: string }>;
@@ -140,6 +142,9 @@ export interface AIAction {
     products?: BulkProductItem[];
     // Existing Zid categories (for smart category review mode)
     existingCategories?: ZidCategory[];
+    // Delete actions
+    categoryId?: string;
+    productId?: string;
   };
 }
 

@@ -10,6 +10,7 @@ import { ThemeCard } from "./ThemeCard";
 import { LogoCard } from "./LogoCard";
 import { BulkProductCard } from "./BulkProductCard";
 import { LandingPageCard } from "./LandingPageCard";
+import { DeleteConfirmCard } from "./DeleteConfirmCard";
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -20,7 +21,8 @@ interface MessageBubbleProps {
   onThemeConfirm: (data: unknown) => void;
   onLogoConfirm: (logoUrl: string) => void;
   onBulkProductsConfirm: (products: BulkProductItem[]) => void;
-  onLandingPageConfirm?: (data: any) => void;
+  onLandingPageConfirm?: (data: unknown) => void;
+  onDeleteConfirm?: () => void;
 }
 
 function timeAgo(date: Date): string {
@@ -41,6 +43,7 @@ export function MessageBubble({
   onLogoConfirm,
   onBulkProductsConfirm,
   onLandingPageConfirm,
+  onDeleteConfirm,
 }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const isRTL = language === "ar";
@@ -126,7 +129,15 @@ export function MessageBubble({
                 action={message.action}
                 sessionId={sessionId}
                 language={language}
-                onConfirm={onLandingPageConfirm || (() => { })}
+                onConfirm={onLandingPageConfirm || (() => {})}
+              />
+            )}
+            {(message.action.type === "delete_category" || message.action.type === "delete_product") && (
+              <DeleteConfirmCard
+                action={message.action}
+                sessionId={sessionId}
+                language={language}
+                onConfirm={onDeleteConfirm || (() => {})}
               />
             )}
           </div>

@@ -28,9 +28,11 @@ export function ThemeCard({ sessionId, language, onConfirm }: ThemeCardProps) {
       .catch(() => {});
   }, [sessionId]);
 
-  const themeUrl = storeId
+  // Both URLs work — dashboard.zid.sa needs the store ID, web.zid.sa is a simpler fallback
+  const dashboardThemeUrl = storeId
     ? `https://dashboard.zid.sa/ar-sa/stores/${storeId}/channels/online-store/themes`
-    : "https://dashboard.zid.sa";
+    : null;
+  const webThemeUrl = "https://web.zid.sa/store-design";
 
   const handleConfirm = () => {
     setConfirmed(true);
@@ -75,15 +77,41 @@ export function ThemeCard({ sessionId, language, onConfirm }: ThemeCardProps) {
 
       {/* Action Buttons */}
       <div className="flex flex-col gap-2.5 pt-2">
+        {/* Primary: dashboard with dynamic store ID (most direct) */}
+        {dashboardThemeUrl ? (
+          <a
+            href={dashboardThemeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-700 hover:to-violet-800 text-white text-sm font-semibold rounded-xl px-5 py-3 shadow-md shadow-violet-200/60 transition-all hover:-translate-y-0.5"
+          >
+            <Sparkles className="w-4 h-4" />
+            {language === "en" ? "Open Theme Settings" : "افتح إعدادات الثيم"}
+            <ExternalLink className="w-3.5 h-3.5 ml-1 opacity-80" />
+          </a>
+        ) : (
+          /* Fallback while store ID is loading */
+          <a
+            href={webThemeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-700 hover:to-violet-800 text-white text-sm font-semibold rounded-xl px-5 py-3 shadow-md shadow-violet-200/60 transition-all hover:-translate-y-0.5"
+          >
+            <Sparkles className="w-4 h-4" />
+            {language === "en" ? "Open Store Design" : "افتح تصميم المتجر"}
+            <ExternalLink className="w-3.5 h-3.5 ml-1 opacity-80" />
+          </a>
+        )}
+
+        {/* Secondary: always show the simpler web.zid.sa link too */}
         <a
-          href={themeUrl}
+          href={webThemeUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-700 hover:to-violet-800 text-white text-sm font-semibold rounded-xl px-5 py-3 shadow-md shadow-violet-200/60 transition-all hover:-translate-y-0.5"
+          className="w-full flex items-center justify-center gap-2 border border-violet-200 bg-violet-50 text-violet-700 text-sm font-medium rounded-xl px-5 py-2.5 hover:bg-violet-100 transition-all"
         >
-          <Sparkles className="w-4 h-4" />
-          {language === "en" ? "Choose Theme in Zid Dashboard" : "اختر الثيم من لوحة تحكم زد"}
-          <ExternalLink className="w-3.5 h-3.5 ml-1 opacity-80" />
+          {language === "en" ? "Or open via web.zid.sa/store-design" : "أو افتح عبر web.zid.sa/store-design"}
+          <ExternalLink className="w-3 h-3 opacity-70" />
         </a>
 
         <Button

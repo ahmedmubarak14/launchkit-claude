@@ -319,7 +319,18 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
     }
   };
 
-  const handleLandingPageConfirm = (landingPageData: any) => {
+  const handleDeleteConfirm = () => {
+    // After a delete, send a follow-up message so AI knows and can suggest next action
+    setTimeout(() => {
+      handleSend(
+        language === "en"
+          ? "Item deleted successfully. What would you like to do next?"
+          : "تم حذف العنصر بنجاح. ماذا تريد أن تفعل بعد ذلك؟"
+      );
+    }, 500);
+  };
+
+  const handleLandingPageConfirm = (landingPageData: unknown) => {
     // In a real app we'd save this generated layout to the DB
     // For now we just acknowledge it and move the progress bar
     setCompletionPercentage(95);
@@ -371,6 +382,7 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
             onLogoConfirm={handleLogoConfirm}
             onBulkProductsConfirm={handleBulkProductsConfirm}
             onLandingPageConfirm={handleLandingPageConfirm}
+            onDeleteConfirm={handleDeleteConfirm}
           />
         ))}
 
