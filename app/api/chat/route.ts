@@ -66,74 +66,40 @@ LANDING PAGE GENERATION RULES:
 
 RULES:
 1. Detect language (Arabic/English) — respond in SAME language always
-2. Be concise — max 3-4 sentences per response
+2. Be concise — max 3-4 sentences in your message field
 3. Always suggest the next step proactively
 4. Generate BOTH Arabic and English versions for all store content
 5. Be warm, encouraging, and action-oriented
-6. Always use the structured action format so interactive cards appear
+6. ALWAYS call the "respond" tool — never reply with plain text
 
-RESPONSE FORMAT — ALWAYS return valid JSON, no markdown, no code blocks:
-{"message":"Your response here","action":{"type":"none","data":{}}}
+ACTION TYPE DATA SCHEMAS (put these in the action.data field):
 
-ACTION TYPES:
+suggest_categories → data: {"categories":[{"nameAr":"اسم عربي","nameEn":"English Name"}]}
 
-suggest_categories — add new categories OR edit existing ones:
-{"type":"suggest_categories","data":{"categories":[{"nameAr":"اسم عربي","nameEn":"English Name"}]}}
+delete_category → data: {"categoryId":"123","nameAr":"اسم الفئة","nameEn":"Category Name"}
 
-delete_category — delete a category by its Zid ID:
-{"type":"delete_category","data":{"categoryId":"123","nameAr":"اسم الفئة","nameEn":"Category Name"}}
+preview_product → data: {"nameAr":"اسم المنتج","nameEn":"Product Name","descriptionAr":"وصف","descriptionEn":"Description","price":99,"variants":[],"imagePrompt":"studio photo of product on white background"}
 
-preview_product — single product (new or edited):
-{"type":"preview_product","data":{"nameAr":"اسم المنتج","nameEn":"Product Name","descriptionAr":"وصف","descriptionEn":"Description","price":99,"variants":[],"imagePrompt":"studio photo of [product] on white background"}}
+delete_product → data: {"productId":"abc-uuid","nameAr":"اسم المنتج","nameEn":"Product Name"}
 
-delete_product — delete a product by its Zid ID:
-{"type":"delete_product","data":{"productId":"abc-uuid","nameAr":"اسم المنتج","nameEn":"Product Name"}}
+bulk_products → data: {"products":[{"nameAr":"اسم","nameEn":"Name","price":50,"descriptionAr":"وصف","descriptionEn":"Desc"}]}
 
-bulk_products — multiple products at once:
-{"type":"bulk_products","data":{"products":[{"nameAr":"اسم","nameEn":"Name","price":50,"descriptionAr":"وصف","descriptionEn":"Desc"}]}}
+suggest_themes → data: {}
 
-suggest_themes — after products, guide to Zid dashboard for themes:
-{"type":"suggest_themes","data":{}}
+generate_logo → data: {"storeName":"Store Name","primaryColor":"#7C3AED","logoPrompt":"clean minimalist logo for a store called Name"}
 
-generate_logo — generate logo:
-{"type":"generate_logo","data":{"storeName":"Store Name","primaryColor":"#7C3AED","logoPrompt":"clean minimalist logo for a [type] store called [name]"}}
-
-generate_landing_page — generate full landing page layout with all sections (BOTH Arabic and English required for every text field):
-{"type":"generate_landing_page","data":{
-  "storeName":"Store Name",
-  "storeNameAr":"اسم المتجر",
-  "primaryColor":"#7C3AED",
-  "hero":{
-    "headline":"Discover Premium [Products]",
-    "headlineAr":"اكتشف [المنتجات] الرائعة",
-    "subheadline":"Curated quality delivered to your door",
-    "subheadlineAr":"جودة مختارة تُوصَل إلى بابك",
-    "cta":"Shop Now",
-    "ctaAr":"تسوق الآن"
-  },
-  "features":[
-    {"icon":"truck","title":"Free Shipping","titleAr":"شحن مجاني","description":"On all orders over 100 SAR","descriptionAr":"على جميع الطلبات فوق ١٠٠ ريال"},
-    {"icon":"shield","title":"Secure Payment","titleAr":"دفع آمن","description":"100% secure checkout","descriptionAr":"دفع آمن ١٠٠٪"}
-  ],
-  "promo":{
-    "headline":"Limited Time Offer — Save 20%",
-    "headlineAr":"عرض محدود — وفّر ٢٠٪",
-    "discount":"20% OFF",
-    "code":"LAUNCH20",
-    "cta":"Claim Offer",
-    "ctaAr":"استفد من العرض"
-  },
-  "testimonials":[
-    {"quote":"Amazing quality, fast delivery!","quoteAr":"جودة رائعة وتوصيل سريع!","author":"Ahmed K.","rating":5},
-    {"quote":"Best store I've ordered from.","quoteAr":"أفضل متجر طلبت منه.","author":"Sara M.","rating":5}
-  ],
+generate_landing_page → data: {
+  "storeName":"Store Name","storeNameAr":"اسم المتجر","primaryColor":"#7C3AED",
+  "hero":{"headline":"...","headlineAr":"...","subheadline":"...","subheadlineAr":"...","cta":"Shop Now","ctaAr":"تسوق الآن"},
+  "features":[{"icon":"truck","title":"Free Shipping","titleAr":"شحن مجاني","description":"On orders over 100 SAR","descriptionAr":"على الطلبات فوق ١٠٠ ريال"},{"icon":"shield","title":"Secure Payment","titleAr":"دفع آمن","description":"100% secure","descriptionAr":"دفع آمن ١٠٠٪"}],
+  "promo":{"headline":"Save 20% Today","headlineAr":"وفّر ٢٠٪ اليوم","discount":"20% OFF","code":"LAUNCH20","cta":"Claim","ctaAr":"استفد"},
+  "testimonials":[{"quote":"Amazing quality!","quoteAr":"جودة رائعة!","author":"Ahmed K.","rating":5},{"quote":"Fast delivery!","quoteAr":"توصيل سريع!","author":"Sara M.","rating":5}],
   "categories":[{"name":"Category 1","nameAr":"الفئة الأولى"}],
-  "seoTitle":"[Store Name] — Best [Products] in Saudi Arabia",
-  "seoDescription":"Shop the best [products] at [Store Name]. Fast delivery across Saudi Arabia. Free shipping on orders over 100 SAR."
-}}
+  "seoTitle":"Store — Best Products in Saudi Arabia",
+  "seoDescription":"Shop the best products. Fast delivery across Saudi Arabia."
+}
 
-none — conversational:
-{"type":"none","data":{}}`;
+none → data: {}`;
 
 // ── Fetch live store data from Zid ────────────────────────────────────────────
 async function fetchLiveStoreContext(userId: string): Promise<string> {
@@ -228,6 +194,50 @@ Use the IDs above when performing edit/delete actions on existing items.
   }
 }
 
+// ── Tool definition for structured action output ──────────────────────────────
+// Using Anthropic tool_use guarantees Claude fills in the full structured data
+// without JSON truncation — especially critical for large landing page layouts.
+const RESPOND_TOOL: Anthropic.Tool = {
+  name: "respond",
+  description: "Always call this tool to send your response. Put your conversational reply in `message` and the UI action in `action`.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      message: {
+        type: "string",
+        description: "Your conversational reply to the merchant (2-4 sentences max)",
+      },
+      action: {
+        type: "object",
+        description: "The UI action to render. Use type='none' for plain conversation.",
+        properties: {
+          type: {
+            type: "string",
+            enum: [
+              "none",
+              "suggest_categories",
+              "preview_product",
+              "preview_coupon",
+              "suggest_themes",
+              "generate_logo",
+              "bulk_products",
+              "generate_landing_page",
+              "delete_category",
+              "delete_product",
+            ],
+          },
+          data: {
+            type: "object",
+            description: "Action-specific data payload. See system prompt for schema per action type.",
+          },
+        },
+        required: ["type"],
+      },
+    },
+    required: ["message", "action"],
+  },
+};
+
 export async function POST(request: NextRequest) {
   try {
     const { message, sessionId, history } = await request.json();
@@ -243,10 +253,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Fetch live store context server-side (parallel with building history)
+    // Fetch live store context server-side
     const liveContext = await fetchLiveStoreContext(user.id);
-
-    // System prompt = base + live store snapshot
     const systemPrompt = `${BASE_SYSTEM_PROMPT}\n\n${liveContext}`;
 
     // Build message history (last 12 messages)
@@ -261,72 +269,47 @@ export async function POST(request: NextRequest) {
     }
     messages.push({ role: "user", content: message });
 
+    // Use tool_use so structured data is NEVER truncated or mangled
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 4096,
       system: systemPrompt,
+      tools: [RESPOND_TOOL],
+      tool_choice: { type: "tool", name: "respond" },
       messages,
     });
 
-    const rawContent = response.content[0].type === "text" ? response.content[0].text : "";
+    // Extract the tool_use result
+    let parsed: { message: string; action: { type: string; data?: Record<string, unknown> } } = {
+      message: "",
+      action: { type: "none", data: {} },
+    };
 
-    let parsed;
-    try {
-      const cleaned = rawContent
-        .replace(/^```json\s*/i, "")
-        .replace(/^```\s*/i, "")
-        .replace(/```\s*$/i, "")
-        .trim();
-
-      // Grab the outermost JSON object
-      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error("No JSON object found");
-
-      try {
-        parsed = JSON.parse(jsonMatch[0]);
-      } catch {
-        // JSON is truncated (common with large landing page payloads).
-        // Try to at least extract the "message" field and the action "type"
-        // so we can still show the correct card even if data is partial.
-        const msgMatch = jsonMatch[0].match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-        const typeMatch = jsonMatch[0].match(/"type"\s*:\s*"([^"]+)"/);
-
-        if (msgMatch && typeMatch && typeMatch[1] !== "none") {
-          // Try to parse only the data block for the action
-          let actionData: Record<string, unknown> = {};
-          const dataMatch = jsonMatch[0].match(/"data"\s*:\s*(\{[\s\S]*)/);
-          if (dataMatch) {
-            // Attempt to auto-close truncated JSON by appending closing braces
-            for (let closes = 1; closes <= 10; closes++) {
-              try {
-                const attempt = dataMatch[1] + "}}}".slice(0, closes);
-                const dataObj = JSON.parse(attempt);
-                actionData = dataObj;
-                break;
-              } catch { /* keep trying */ }
-            }
-          }
-          parsed = {
-            message: msgMatch[1].replace(/\\n/g, "\n").replace(/\\"/g, '"'),
-            action: { type: typeMatch[1], data: actionData },
-          };
-        } else {
-          // Total fallback — show as plain message
-          parsed = { message: cleaned, action: { type: "none" } };
-        }
+    for (const block of response.content) {
+      if (block.type === "tool_use" && block.name === "respond") {
+        const input = block.input as { message?: string; action?: { type: string; data?: Record<string, unknown> } };
+        parsed.message = input.message || "";
+        parsed.action = input.action || { type: "none", data: {} };
+        break;
       }
-    } catch {
-      parsed = { message: rawContent, action: { type: "none" } };
+      // Fallback: if somehow Claude returns plain text instead of tool_use
+      if (block.type === "text" && !parsed.message) {
+        parsed.message = block.text;
+      }
     }
 
     if (!parsed.action) parsed.action = { type: "none", data: {} };
     if (!parsed.action.data) parsed.action.data = {};
 
-    // Save to DB
-    await supabase.from("messages").insert([
-      { session_id: sessionId, role: "user", content: message },
-      { session_id: sessionId, role: "assistant", content: parsed.message, metadata: { action: parsed.action } },
-    ]);
+    // Save to DB (best-effort — don't let DB failure break the response)
+    try {
+      await supabase.from("messages").insert([
+        { session_id: sessionId, role: "user", content: message },
+        { session_id: sessionId, role: "assistant", content: parsed.message, metadata: { action: parsed.action } },
+      ]);
+    } catch (dbErr) {
+      console.warn("[chat] DB insert skipped:", dbErr);
+    }
 
     return NextResponse.json(parsed);
   } catch (error) {
