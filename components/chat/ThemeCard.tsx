@@ -72,19 +72,7 @@ export function ThemeCard({ language, onConfirm }: ThemeCardProps) {
           <ExternalLink className="w-3.5 h-3.5 ml-1 opacity-80" />
         </a>
 
-        {/* Secondary: browse the theme marketplace for new themes to install */}
-        <a
-          href="https://apps.zid.sa/themes"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full flex items-center justify-center gap-2 border border-violet-200 bg-violet-50 text-violet-700 text-sm font-medium rounded-xl px-5 py-2.5 hover:bg-violet-100 transition-all"
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          {language === "en" ? "Browse Theme Market (install new)" : "تصفح سوق الثيمات (تثبيت جديد)"}
-          <ExternalLink className="w-3 h-3 ml-1 opacity-70" />
-        </a>
-
-        <Button
+<Button
           onClick={handleConfirm}
           variant="outline"
           className="w-full text-sm font-medium rounded-xl border-gray-200 text-gray-600 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700 py-3"
