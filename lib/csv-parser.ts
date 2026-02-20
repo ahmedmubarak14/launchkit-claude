@@ -82,3 +82,19 @@ export function parseProductsFromCSV(text: string): BulkProductItem[] {
   const rows = parseCSV(text);
   return rows.map(mapRowToBulkProduct).filter((p): p is BulkProductItem => p !== null);
 }
+
+/**
+ * Parse products from XLSX rows (array of objects from SheetJS sheet_to_json).
+ * Keys are lowercased for matching.
+ */
+export function parseProductsFromXLSXRows(rows: Record<string, unknown>[]): BulkProductItem[] {
+  return rows
+    .map((raw) => {
+      const row: Record<string, string> = {};
+      for (const [k, v] of Object.entries(raw)) {
+        row[String(k).trim().toLowerCase()] = String(v ?? "").trim();
+      }
+      return mapRowToBulkProduct(row);
+    })
+    .filter((p): p is BulkProductItem => p !== null);
+}
