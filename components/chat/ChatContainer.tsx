@@ -187,6 +187,8 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
         setCompletionPercentage(75);
       } else if (data.action?.type === "generate_logo") {
         setCompletionPercentage(88);
+      } else if (data.action?.type === "generate_landing_page") {
+        setCompletionPercentage(95);
       }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -330,15 +332,15 @@ export function ChatContainer({ sessionId }: ChatContainerProps) {
     }, 500);
   };
 
-  const handleLandingPageConfirm = (landingPageData: unknown) => {
-    // In a real app we'd save this generated layout to the DB
-    // For now we just acknowledge it and move the progress bar
+  const handleLandingPageConfirm = (_landingPageData: unknown) => {
+    // Layout is saved by LandingPageCard itself via /api/store/landing-page
+    // Here we just advance progress and send a follow-up message
     setCompletionPercentage(95);
     setTimeout(() => {
       handleSend(
         language === "en"
-          ? "I've saved your landing page layout! Is there anything else you'd like to do to set up your store today?"
-          : "لقد حفظت تخطيط صفحتك المقصودة! هل هناك أي شيء آخر تود القيام به لإعداد متجرك اليوم؟"
+          ? "Landing page layout saved! Open your Zid Store Builder to apply the generated content to your homepage sections. Is there anything else you'd like to do?"
+          : "تم حفظ تخطيط الصفحة الرئيسية! افتح منشئ متجر زد لتطبيق المحتوى المُنشأ على أقسام صفحتك الرئيسية. هل هناك أي شيء آخر تود فعله؟"
       );
     }, 500);
   };
