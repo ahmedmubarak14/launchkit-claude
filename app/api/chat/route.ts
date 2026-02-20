@@ -263,7 +263,7 @@ export async function POST(request: NextRequest) {
 
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 1024,
+      max_tokens: 4096,
       system: systemPrompt,
       messages,
     });
@@ -277,8 +277,44 @@ export async function POST(request: NextRequest) {
         .replace(/^```\s*/i, "")
         .replace(/```\s*$/i, "")
         .trim();
+
+      // Grab the outermost JSON object
       const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-      parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { message: rawContent, action: { type: "none" } };
+      if (!jsonMatch) throw new Error("No JSON object found");
+
+      try {
+        parsed = JSON.parse(jsonMatch[0]);
+      } catch {
+        // JSON is truncated (common with large landing page payloads).
+        // Try to at least extract the "message" field and the action "type"
+        // so we can still show the correct card even if data is partial.
+        const msgMatch = jsonMatch[0].match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+        const typeMatch = jsonMatch[0].match(/"type"\s*:\s*"([^"]+)"/);
+
+        if (msgMatch && typeMatch && typeMatch[1] !== "none") {
+          // Try to parse only the data block for the action
+          let actionData: Record<string, unknown> = {};
+          const dataMatch = jsonMatch[0].match(/"data"\s*:\s*(\{[\s\S]*)/);
+          if (dataMatch) {
+            // Attempt to auto-close truncated JSON by appending closing braces
+            for (let closes = 1; closes <= 10; closes++) {
+              try {
+                const attempt = dataMatch[1] + "}}}".slice(0, closes);
+                const dataObj = JSON.parse(attempt);
+                actionData = dataObj;
+                break;
+              } catch { /* keep trying */ }
+            }
+          }
+          parsed = {
+            message: msgMatch[1].replace(/\\n/g, "\n").replace(/\\"/g, '"'),
+            action: { type: typeMatch[1], data: actionData },
+          };
+        } else {
+          // Total fallback — show as plain message
+          parsed = { message: cleaned, action: { type: "none" } };
+        }
+      }
     } catch {
       parsed = { message: rawContent, action: { type: "none" } };
     }
