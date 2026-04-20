@@ -99,6 +99,8 @@ export interface BulkProductItem {
   price: number;
   descriptionAr?: string;
   descriptionEn?: string;
+  imageUrl?: string;
+  categoryName?: string;
 }
 
 // ─── New: Logo Config ──────────────────────────────────────────────────────────

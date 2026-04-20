@@ -57,6 +57,8 @@ function splitCSVLine(line: string): string[] {
  *   price
  *   description_ar / desc_ar
  *   description_en / desc_en
+ *   image_url / image / صورة
+ *   category / category_name / فئة
  */
 export function mapRowToBulkProduct(row: Record<string, string>): BulkProductItem | null {
   const nameAr =
@@ -69,13 +71,32 @@ export function mapRowToBulkProduct(row: Record<string, string>): BulkProductIte
   const priceRaw = row["price"] || row["سعر"] || "0";
   const price = parseFloat(priceRaw.replace(/[^0-9.]/g, "")) || 0;
 
+  const imageUrlRaw =
+    row["image_url"] || row["image-url"] || row["imageurl"] || row["image"] || row["صورة"] || "";
+  const imageUrl = isValidImageUrl(imageUrlRaw) ? imageUrlRaw : undefined;
+
+  const categoryName =
+    row["category"] || row["category_name"] || row["category-name"] || row["categoryname"] || row["فئة"] || row["التصنيف"] || "";
+
   return {
     nameAr: nameAr || nameEn,
     nameEn: nameEn || nameAr,
     price,
     descriptionAr: row["description_ar"] || row["desc_ar"] || row["وصف"] || undefined,
     descriptionEn: row["description_en"] || row["desc_en"] || row["description"] || undefined,
+    imageUrl,
+    categoryName: categoryName || undefined,
   };
+}
+
+function isValidImageUrl(value: string): boolean {
+  if (!value) return false;
+  try {
+    const u = new URL(value);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 export function parseProductsFromCSV(text: string): BulkProductItem[] {
