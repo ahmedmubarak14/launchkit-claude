@@ -1,0 +1,83 @@
+# LaunchKit Theme
+
+Forked from [zidsa/growth-theme](https://github.com/zidsa/growth-theme) (ISC license).
+Vendored into this repo at the time of writing — upstream `.git` history was stripped.
+
+## Why this lives here
+
+The LaunchKit app currently injects landing-page HTML into a merchant's
+storefront via the Zid App Scripts API. That approach is fragile (depends on
+whatever theme the merchant has installed) and limits how much LaunchKit can
+own the storefront experience.
+
+Owning a theme lets LaunchKit:
+
+- Pre-bake sensible defaults (typography, colors, layout) so a brand-new store
+  looks intentional, not generic
+- Define section schemas the AI can target deterministically when generating
+  hero copy, featured-product blocks, category nav, etc.
+- Survive Zid platform updates by building against a known theme structure
+
+## How it integrates with LaunchKit
+
+End-to-end flow once the theme-upload API is wired up (see "Pending: API spike"
+below):
+
+1. **Build:** `make build` produces `build/launchkit-theme-YYYY-MM-DD.zip`
+   (matches the format the Zid dashboard's "Upload new theme" form accepts)
+2. **Onboarding step (per merchant):** the LaunchKit setup flow uploads the
+   ZIP to the merchant's store via the Zid theme-upload endpoint, then
+   activates it
+3. **Content push (existing, working today):** LaunchKit's chat-driven setup
+   creates products and categories via the Zid product/category APIs — these
+   render through the new theme's templates immediately
+4. **Per-merchant customization:** AI-generated section settings (logo,
+   primary color, hero copy) are applied as theme settings — either via API
+   if one exists, or surfaced as a "copy this into your dashboard" UI
+
+## Pending: API spike
+
+The "Custom themes → Upload new theme" form in the Zid Partner Dashboard
+clearly hits some endpoint, but it is not in the public docs. Before wiring
+up automated upload, do a 30-min DevTools spike:
+
+1. Open Chrome DevTools → Network tab on `partner.zid.sa`
+2. Upload a tiny dummy ZIP via the dashboard
+3. Capture: endpoint URL, HTTP method, auth header, body shape
+4. Repeat for the "Activate theme" action
+
+If the endpoint accepts the same `X-Manager-Token` LaunchKit already uses,
+the upload step can be fully automated. If not, fall back to a guided manual
+upload during onboarding.
+
+## Build commands (from upstream)
+
+```bash
+npm install
+npm run dev      # parallel CSS + JS watch
+npm run build    # production build (minified CSS + both JS bundles)
+make build       # produces the upload-ready ZIP under ./build/
+```
+
+## What's customized vs. what's still upstream
+
+Right now: `package.json` is rebranded (name, repo, homepage) and the
+Makefile output filename is `launchkit-theme-*.zip`. **Everything else is
+identical to the upstream growth-theme as of the vendor date.** Visual and
+schema customizations (LaunchKit color palette, default section content,
+LaunchKit-specific section types) are intentionally deferred until the
+API-spike result tells us how much of the per-merchant config can be
+automated.
+
+## Upstream tracking
+
+To pull updates from upstream:
+
+```bash
+git remote add growth-theme https://github.com/zidsa/growth-theme  # one-time
+git fetch growth-theme
+# review the diff manually, apply selectively into ./theme/
+```
+
+A submodule was deliberately avoided — vendoring keeps the LaunchKit repo
+self-contained and simplifies Vercel/CI builds.
