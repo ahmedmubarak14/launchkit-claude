@@ -61,13 +61,48 @@ make build       # produces the upload-ready ZIP under ./build/
 
 ## What's customized vs. what's still upstream
 
-Right now: `package.json` is rebranded (name, repo, homepage) and the
-Makefile output filename is `launchkit-theme-*.zip`. **Everything else is
-identical to the upstream growth-theme as of the vendor date.** Visual and
-schema customizations (LaunchKit color palette, default section content,
-LaunchKit-specific section types) are intentionally deferred until the
-API-spike result tells us how much of the per-merchant config can be
-automated.
+### Rebranding
+- `package.json` — name, repo, homepage point at LaunchKit
+- `Makefile` — output filename is `launchkit-theme-YYYY-MM-DD.zip`
+
+### Niche tuning (silver accessories / luxe-minimal / Arabic-first)
+The first LaunchKit pilot is a silver-accessories store ("Fiddah" / فضة).
+Defaults are tuned for that aesthetic and that audience, but no
+store-specific name is hardcoded — every default works for any
+silver/jewelry/accessory merchant in the same niche.
+
+- **`layout.json`** — color palette shifted to a luxe-minimal silver+champagne
+  scheme inspired by [axels-store.webflow.io](https://axels-store.webflow.io):
+  - `theme_primary` `#0D0D0D` (near-black, for buttons/headings)
+  - `theme_secondary` `#F4F1EC` (warm cream, for section backgrounds)
+  - `theme_accent` `#B3A389` (soft champagne/platinum)
+  - `theme_border` `#E5E0D8` (silver-tinted)
+  - `theme_radius` `2` (tighter corners — more editorial)
+  - English font swapped from `Roboto` → `Inter` (more luxe-minimal)
+  - Arabic font kept as `IBM Plex Sans Arabic` (already a strong choice)
+
+- **`sections/hero.schema.json`** — default copy switched to Arabic-first
+  silver-accessory voice:
+  - badge: "مجموعة جديدة"
+  - heading: "أناقة بلمسة فضية"
+  - description: silver-accessory tagline
+  - button: "تسوقي الآن"
+
+  Defaults are per-field strings (not per-locale objects), so a merchant on
+  English will see the Arabic placeholder until they set their own copy in
+  the dashboard. This is fine for the Arabic-first audience.
+
+### What's still pure upstream
+Layout templates, sections (other than `hero`), components, JS/CSS, locale
+files, build pipeline, and trust/UX patterns are all unchanged from
+`zidsa/growth-theme`. RTL is platform-driven (`dir` attribute reads
+`session.locale.language.direction` in `layout.jinja`) — already correct
+for any merchant whose Zid store is set to Arabic.
+
+### Deferred until the API-upload spike confirms the path
+- Per-merchant generated logo/colors fed in at theme-publish time
+- LaunchKit-specific section types (e.g. AI-generated lookbook, founder note)
+- Heavier visual restructuring beyond schema defaults
 
 ## Upstream tracking
 

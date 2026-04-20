@@ -115,7 +115,7 @@
         "ar": "نص الشارة",
         "en": "Badge Text"
       },
-      "default": "NEW COLLECTION"
+      "default": "مجموعة جديدة"
     },
     {
       "id": "heading",
@@ -124,7 +124,7 @@
         "ar": "العنوان الرئيسي",
         "en": "Heading"
       },
-      "default": "Superbloom 2025"
+      "default": "أناقة بلمسة فضية"
     },
     {
       "id": "description",
@@ -133,7 +133,7 @@
         "ar": "الوصف",
         "en": "Description"
       },
-      "default": "Step into the season with flowing silhouettes and effortless elegance."
+      "default": "اكتشفي مجموعة من الإكسسوارات الفضية المصممة بعناية لتضيف لمسة من الفخامة إلى يومك."
     },
     {
       "id": "button_text",
@@ -142,7 +142,7 @@
         "ar": "نص الزر",
         "en": "Button Text"
       },
-      "default": "Shop the Collection"
+      "default": "تسوقي الآن"
     },
     {
       "id": "button_url",
