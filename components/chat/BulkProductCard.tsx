@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, ImageOff, Package, AlertTriangle } from "lucide-react";
+import { Check, ImageOff, Package, AlertTriangle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AIAction, BulkProductItem, ZidCategory } from "@/types";
 
@@ -212,16 +212,27 @@ export function BulkProductCard({ action, sessionId, language, onConfirm }: Bulk
         </span>
       </div>
 
-      {/* Unmatched-category warning */}
+      {/* Category banner — empty store = informational, populated store = warning */}
       {categoriesLoaded && unmatched.length > 0 && (
-        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-          <AlertTriangle className="w-3.5 h-3.5 text-amber-500 mt-0.5 flex-shrink-0" />
-          <p className="text-[11px] text-amber-700 leading-relaxed">
-            {language === "en"
-              ? `${unmatched.length} row${unmatched.length > 1 ? "s" : ""} reference a category not in your store. Pick an existing one or keep "Create new" to add it.`
-              : `${unmatched.length} ${unmatched.length > 1 ? "صفوف تشير" : "صف يشير"} إلى فئة غير موجودة في متجرك. اختر فئة موجودة أو أبقِ "إنشاء جديدة" لإضافتها.`}
-          </p>
-        </div>
+        liveCategories.length === 0 ? (
+          <div className="flex items-start gap-2 bg-violet-50 border border-violet-200 rounded-xl px-3 py-2">
+            <Sparkles className="w-3.5 h-3.5 text-violet-500 mt-0.5 flex-shrink-0" />
+            <p className="text-[11px] text-violet-700 leading-relaxed">
+              {language === "en"
+                ? `Your store has no categories yet. ${unmatched.length} new categor${unmatched.length > 1 ? "ies" : "y"} from your file will be created automatically.`
+                : `متجرك لا يحتوي على فئات بعد. سيتم إنشاء ${unmatched.length} ${unmatched.length > 1 ? "فئات جديدة" : "فئة جديدة"} من ملفك تلقائيًا.`}
+            </p>
+          </div>
+        ) : (
+          <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-500 mt-0.5 flex-shrink-0" />
+            <p className="text-[11px] text-amber-700 leading-relaxed">
+              {language === "en"
+                ? `${unmatched.length} row${unmatched.length > 1 ? "s" : ""} reference a category not in your store. Pick an existing one or keep "Create new" to add it.`
+                : `${unmatched.length} ${unmatched.length > 1 ? "صفوف تشير" : "صف يشير"} إلى فئة غير موجودة في متجرك. اختر فئة موجودة أو أبقِ "إنشاء جديدة" لإضافتها.`}
+            </p>
+          </div>
+        )
       )}
 
       {/* Products table */}
@@ -327,16 +338,22 @@ export function BulkProductCard({ action, sessionId, language, onConfirm }: Bulk
         </div>
       )}
 
-      {/* Confirm button */}
+      {/* Confirm button — disabled until categories fetch settles to avoid a race
+          where rows still show NO_CATEGORY before resolveChoice() runs */}
       <Button
         onClick={handleConfirm}
-        disabled={loading || selected.length === 0}
+        disabled={loading || selected.length === 0 || !categoriesLoaded}
         className="w-full bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-700 hover:to-violet-800 text-white text-sm font-semibold rounded-xl px-5 py-2.5 h-auto shadow-md shadow-violet-200/60 transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:translate-y-0 gap-2"
       >
         {loading ? (
           <>
             <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             {language === "en" ? "Adding..." : "جاري الإضافة..."}
+          </>
+        ) : !categoriesLoaded ? (
+          <>
+            <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            {language === "en" ? "Checking your store..." : "جاري فحص متجرك..."}
           </>
         ) : (
           <>
