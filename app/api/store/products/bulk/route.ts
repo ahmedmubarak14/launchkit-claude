@@ -4,15 +4,22 @@ import { createClient } from "@/lib/supabase/server";
 import { getZidSession, zidFetch } from "@/lib/zid/client";
 
 const ProductInputSchema = z.object({
-  nameAr: z.string().min(1),
-  nameEn: z.string().min(1),
-  price: z.number().nonnegative(),
+  nameAr: z.string().min(1).optional(),
+  nameEn: z.string().min(1).optional(),
+  price: z.union([z.number(), z.string()]).transform((v) => {
+    if (typeof v === "number") return v;
+    const n = parseFloat(String(v).replace(/[^0-9.-]/g, ""));
+    return Number.isFinite(n) ? n : 0;
+  }),
   descriptionAr: z.string().optional(),
   descriptionEn: z.string().optional(),
-  imageUrl: z.string().url().optional(),
+  imageUrl: z.string().optional(),
   categoryName: z.string().optional(),
   categoryId: z.string().optional(),
-});
+}).refine(
+  (p) => !!(p.nameAr || p.nameEn),
+  { message: "At least one of nameAr or nameEn is required" }
+);
 
 const BulkSchema = z.object({
   products: z.array(ProductInputSchema).min(1).max(100),
@@ -61,10 +68,13 @@ export async function POST(request: NextRequest) {
   const failed: { name: string; reason: string }[] = [];
 
   for (const p of parsed.data.products) {
+    // Fall back each way: if only one language is provided, mirror it.
+    const nameAr = p.nameAr || p.nameEn || "";
+    const nameEn = p.nameEn || p.nameAr || "";
     const resolvedCategoryId = p.categoryId || (p.categoryName ? categoryIndex.get(p.categoryName.toLowerCase()) : undefined);
 
     const body = {
-      name: { ar: p.nameAr, en: p.nameEn },
+      name: { ar: nameAr, en: nameEn },
       description: { ar: p.descriptionAr ?? "", en: p.descriptionEn ?? "" },
       price: p.price,
       sku: `LK-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -83,13 +93,13 @@ export async function POST(request: NextRequest) {
     });
 
     if (!res.ok) {
-      failed.push({ name: p.nameEn, reason: `Zid HTTP ${res.status}` });
+      failed.push({ name: nameEn, reason: `Zid HTTP ${res.status}: ${res.text.slice(0, 120)}` });
       continue;
     }
 
     const created_json = res.json as { id?: string | number; product?: { id?: string | number } } | null;
     const zidId = String(created_json?.id ?? created_json?.product?.id ?? "");
-    created.push({ zidId, name: p.nameEn });
+    created.push({ zidId, name: nameEn });
 
     // Attach category if resolved
     if (zidId && resolvedCategoryId) {

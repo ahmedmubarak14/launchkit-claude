@@ -506,7 +506,10 @@ function LocalBulkUploadCard({
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || `HTTP ${res.status}`);
+        const issueDetail = Array.isArray(data.issues) && data.issues.length > 0
+          ? ` · ${data.issues.map((i: { path?: (string | number)[]; message?: string }) => `${(i.path ?? []).join(".")}: ${i.message ?? "invalid"}`).join("; ")}`
+          : "";
+        setError(`${data.error || `HTTP ${res.status}`}${issueDetail}`);
         return;
       }
 
