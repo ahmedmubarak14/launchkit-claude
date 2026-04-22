@@ -33,10 +33,21 @@ export async function middleware(request: NextRequest) {
 
   if (!isProtected && !isAuthOnly) return intlResponse;
 
+  // If Supabase env vars are missing, don't crash the middleware — just let
+  // the page render. This keeps the landing page usable before the merchant
+  // has finished wiring .env.local. Protected pages will still redirect to
+  // login via the (app) layout guard, which has clearer error messaging.
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnon) {
+    console.warn("[middleware] Supabase env vars missing — skipping auth check. Create .env.local.");
+    return intlResponse;
+  }
+
   const response = intlResponse;
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnon,
     {
       cookies: {
         getAll() {
