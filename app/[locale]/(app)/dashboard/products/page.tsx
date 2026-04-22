@@ -1,12 +1,12 @@
 import { setRequestLocale } from "next-intl/server";
-import { AuthForm } from "@/components/auth/AuthForm";
+import { ProductsTable } from "@/components/products/ProductsTable";
 
-export default async function LoginPage({
+export default async function ProductsPage({
   params,
 }: {
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  return <AuthForm mode="login" />;
+  return <ProductsTable />;
 }
