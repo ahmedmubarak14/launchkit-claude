@@ -59,7 +59,7 @@ export function SettingsClient({
       <section className="rounded-3xl border hairline bg-paper p-8">
         <h2 className="font-display text-xl mb-1">{isAr ? "الملف الشخصي" : "Profile"}</h2>
         <p className="text-sm text-muted-ink mb-6">
-          {isAr ? "معلوماتك الأساسية داخل لانش كيت." : "Your core LaunchKit details."}
+          {isAr ? "بياناتك الأساسية في لانش كِت." : "Your core LaunchKit details."}
         </p>
         <form action={profileAction} className="space-y-4">
           <input type="hidden" name="locale" value={locale} />
@@ -90,7 +90,7 @@ export function SettingsClient({
           {profileState?.ok && (
             <p className="text-sm text-emerald-700 inline-flex items-center gap-1.5">
               <Check className="w-3.5 h-3.5" />
-              {isAr ? "تم الحفظ." : "Saved."}
+              {isAr ? "تمّ الحفظ بنجاح." : "Saved."}
             </p>
           )}
 
@@ -110,7 +110,7 @@ export function SettingsClient({
         <div>
           <h2 className="font-display text-xl">{isAr ? "اللغة" : "Language"}</h2>
           <p className="text-sm text-muted-ink mt-1">
-            {isAr ? "تبديل واجهة لانش كيت." : "Switch the LaunchKit interface."}
+            {isAr ? "بدّل لغة واجهة لانش كِت." : "Switch the LaunchKit interface."}
           </p>
         </div>
         <LanguageToggle />
@@ -119,11 +119,11 @@ export function SettingsClient({
       {/* Zid connection */}
       <section className="rounded-3xl border hairline bg-paper p-8">
         <h2 className="font-display text-xl mb-1">
-          {isAr ? "اتصال زد" : "Zid connection"}
+          {isAr ? "ربط زد" : "Zid connection"}
         </h2>
         <p className="text-sm text-muted-ink mb-6">
           {isAr
-            ? "إدارة الربط مع متجر زد الخاص بك."
+            ? "إدارة ربط لانش كِت بمتجرك على زد."
             : "Manage the link with your Zid store."}
         </p>
 
@@ -131,7 +131,7 @@ export function SettingsClient({
           <div className="space-y-5">
             <div className="rounded-2xl bg-cream/60 border hairline px-5 py-4">
               <div className="text-xs tracking-[0.18em] uppercase text-muted-ink">
-                {isAr ? "متصل" : "Connected"}
+                {isAr ? "مربوط" : "Connected"}
               </div>
               <div className="font-display text-lg mt-1">{store.name || store.id}</div>
               <div className="text-xs text-muted-ink mt-1 tabular-nums">ID · {store.id}</div>
@@ -145,7 +145,7 @@ export function SettingsClient({
               {zidState?.ok && (
                 <p className="text-sm text-emerald-700 mb-3 inline-flex items-center gap-1.5">
                   <Check className="w-3.5 h-3.5" />
-                  {isAr ? "تم الفصل." : "Disconnected."}
+                  {isAr ? "تمّ فصل المتجر." : "Disconnected."}
                 </p>
               )}
               <button
@@ -160,7 +160,7 @@ export function SettingsClient({
           </div>
         ) : (
           <p className="text-sm text-muted-ink">
-            {isAr ? "لا يوجد متجر مربوط." : "No store is linked."}
+            {isAr ? "لا يوجد متجر مربوط حالياً." : "No store is linked."}
           </p>
         )}
       </section>

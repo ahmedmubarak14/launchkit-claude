@@ -31,14 +31,14 @@ export default async function ConnectPage({
   return (
     <div className="max-w-3xl mx-auto px-6 lg:px-10 py-14">
       <div className="text-xs tracking-[0.22em] uppercase text-muted-ink mb-4">
-        {isAr ? "الاتصال" : "Connection"}
+        {isAr ? "الربط" : "Connection"}
       </div>
       <h1 className="font-display text-4xl md:text-5xl tracking-tight leading-tight">
-        {isAr ? "اربط متجر زد الخاص بك" : "Connect your Zid store"}
+        {isAr ? "اربط متجرك على زد" : "Connect your Zid store"}
       </h1>
       <p className="mt-4 text-muted-ink text-lg max-w-2xl">
         {isAr
-          ? "خطوة واحدة. بعدها يصبح لانش كيت زميلاً داخل متجرك، يقرأ كتالوجك ويدير كل عملية نيابة عنك."
+          ? "خطوة واحدة فقط. بعدها يصبح لانش كِت امتداداً لفريقك داخل متجرك — يقرأ كتالوجك ويدير عملياتك بالكامل."
           : "One click. LaunchKit becomes a teammate inside your store — reading your catalogue and running every operation on your behalf."}
       </p>
 
@@ -47,7 +47,7 @@ export default async function ConnectPage({
           <Info className="w-4 h-4 text-champagne mt-0.5 flex-shrink-0" />
           <p className="text-ink leading-relaxed">
             {isAr
-              ? "مساحة العمل تحتاج متجر زد مربوطاً. اربطه الآن وسنعيدك مباشرة بعد ذلك."
+              ? "تحتاج المحادثة إلى متجر زد مربوط. اربط متجرك الآن وسنعيدك مباشرةً."
               : "The workspace needs a connected Zid store. Link it now and we'll drop you back in."}
           </p>
         </div>
@@ -61,8 +61,8 @@ export default async function ConnectPage({
           <div className="font-display text-xl">Zid</div>
           <div className="text-sm text-muted-ink mt-0.5">
             {connected
-              ? (isAr ? `متصل · ${store?.store_name || store?.store_id}` : `Connected · ${store?.store_name || store?.store_id}`)
-              : (isAr ? "غير مرتبط" : "Not connected")}
+              ? (isAr ? `مربوط · ${store?.store_name || store?.store_id}` : `Connected · ${store?.store_name || store?.store_id}`)
+              : (isAr ? "غير مربوط" : "Not connected")}
           </div>
         </div>
         {connected ? (

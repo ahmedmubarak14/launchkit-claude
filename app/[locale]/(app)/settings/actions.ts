@@ -23,19 +23,19 @@ export async function updateProfileAction(_prev: SettingsState, formData: FormDa
   });
   const locale = resolveLocale(String(formData.get("locale") || defaultLocale));
   if (!parsed.success) {
-    return { error: locale === "ar" ? "تحقّق من الاسم." : "Check the name field." };
+    return { error: locale === "ar" ? "يُرجى إدخال اسم صحيح." : "Check the name field." };
   }
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: locale === "ar" ? "جلسة غير صالحة." : "Invalid session." };
+  if (!user) return { error: locale === "ar" ? "انتهت صلاحيّة الجلسة. يُرجى تسجيل الدخول مجدّداً." : "Invalid session." };
 
   const { error } = await supabase
     .from("profiles")
     .update({ name: parsed.data.name })
     .eq("id", user.id);
 
-  if (error) return { error: locale === "ar" ? "تعذّر الحفظ." : "Couldn't save." };
+  if (error) return { error: locale === "ar" ? "تعذّر حفظ البيانات." : "Couldn't save." };
 
   revalidatePath(`/${locale}/settings`);
   return { ok: true };
@@ -45,7 +45,7 @@ export async function disconnectZidAction(_prev: SettingsState, formData: FormDa
   const locale = resolveLocale(String(formData.get("locale") || defaultLocale));
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: locale === "ar" ? "جلسة غير صالحة." : "Invalid session." };
+  if (!user) return { error: locale === "ar" ? "انتهت صلاحيّة الجلسة. يُرجى تسجيل الدخول مجدّداً." : "Invalid session." };
 
   const { error } = await supabase
     .from("stores")
@@ -53,7 +53,7 @@ export async function disconnectZidAction(_prev: SettingsState, formData: FormDa
     .eq("user_id", user.id)
     .eq("platform", "zid");
 
-  if (error) return { error: locale === "ar" ? "تعذّر فصل المتجر." : "Couldn't disconnect the store." };
+  if (error) return { error: locale === "ar" ? "تعذّر فصل المتجر. يُرجى المحاولة لاحقاً." : "Couldn't disconnect the store." };
 
   revalidatePath(`/${locale}/settings`);
   revalidatePath(`/${locale}/dashboard`);

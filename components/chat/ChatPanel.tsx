@@ -45,7 +45,7 @@ export function ChatPanel() {
       id: "sys-intro",
       role: "assistant",
       content: isAr
-        ? "أهلاً! أنا لانش كيت. اكتب أو تحدّث وسأنفّذ على متجرك مباشرة."
+        ? "أهلاً بك. أنا لانش كِت. اكتب أو تحدّث، وسأنفّذ ما تطلبه في متجرك مباشرةً."
         : "Hi, I'm LaunchKit. Type or talk — I act on your live store directly.",
     },
   ]);
@@ -90,7 +90,7 @@ export function ChatPanel() {
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: isAr ? "حدث خطأ. حاول مرة أخرى." : "Something went wrong. Try again.",
+          content: isAr ? "حدث خطأ غير متوقّع. تفضّل بالمحاولة مرّة أخرى." : "Something went wrong. Try again.",
         },
       ]);
     },
@@ -119,7 +119,7 @@ export function ChatPanel() {
         const data = await res.json();
         products = parseProductsFromXLSXRows(data.rows || []);
       } else {
-        throw new Error(isAr ? "صيغة غير مدعومة" : "Unsupported format");
+        throw new Error(isAr ? "صيغة الملف غير مدعومة" : "Unsupported format");
       }
 
       if (products.length === 0) {
@@ -129,7 +129,7 @@ export function ChatPanel() {
             id: crypto.randomUUID(),
             role: "assistant",
             content: isAr
-              ? "الملف لا يحتوي على منتجات قابلة للقراءة. تأكّد من وجود أعمدة name_ar / name_en / price."
+              ? "لم أتمكّن من قراءة أيّ منتجات من هذا الملف. تأكّد من وجود الأعمدة التالية: name_ar و name_en و price."
               : "Couldn't read any products from that file. Make sure it has name_ar / name_en / price columns.",
           },
         ]);
@@ -141,7 +141,7 @@ export function ChatPanel() {
         .map((p) => `- ${p.nameEn} / ${p.nameAr} — ${p.price} SAR${p.categoryName ? ` [${p.categoryName}]` : ""}${p.imageUrl ? ` 🖼️` : ""}`)
         .join("\n");
       const message = isAr
-        ? `رفعت ملف ${file.name} يحتوي على ${products.length} منتج. أعرضها كمعاينة لأراجعها ثم أنشرها.\n\n${lines}${products.length > 20 ? `\n…و ${products.length - 20} منتج إضافي` : ""}`
+        ? `رفعتُ ملف ${file.name} يحتوي على ${products.length} منتج. من فضلك اعرضها للمعاينة حتّى أراجعها قبل النشر.\n\n${lines}${products.length > 20 ? `\n…وبقيّة ${products.length - 20} منتج` : ""}`
         : `I uploaded ${file.name} with ${products.length} products. Show them as a preview so I can review before publishing.\n\n${lines}${products.length > 20 ? `\n…and ${products.length - 20} more` : ""}`;
 
       submit(message);
@@ -151,7 +151,7 @@ export function ChatPanel() {
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: isAr ? `تعذّرت قراءة الملف: ${String(err)}` : `Couldn't read the file: ${String(err)}`,
+          content: isAr ? `تعذّرت قراءة الملف. التفاصيل: ${String(err)}` : `Couldn't read the file: ${String(err)}`,
         },
       ]);
     } finally {
@@ -275,7 +275,7 @@ function ToolEventPill({ event, isAr }: { event: ToolEvent; isAr: boolean }) {
       <span className="font-medium">{event.name}</span>
       <span className="opacity-70">·</span>
       <span>{event.summary}</span>
-      <span className="sr-only">{isAr ? "حدث أداة" : "tool event"}</span>
+      <span className="sr-only">{isAr ? "نتيجة تنفيذ أداة" : "tool event"}</span>
     </div>
   );
 }
@@ -285,11 +285,11 @@ function UiActionCard({ ui, isAr }: { ui: UiPayload; isAr: boolean }) {
     return (
       <div className="rounded-2xl border hairline bg-cream/60 p-5">
         <div className="text-xs tracking-[0.18em] uppercase text-muted-ink mb-2">
-          {isAr ? "تثبيت القالب" : "Theme install"}
+          {isAr ? "تركيب القالب" : "Theme install"}
         </div>
         <p className="text-sm text-ink leading-relaxed mb-3">
           {isAr
-            ? "حمّل الملف وارفعه من لوحة تحكم زد ← القوالب المخصصة ← رفع قالب جديد."
+            ? "حمّل ملف القالب، ثم ارفعه من لوحة تحكّم زد: القوالب المخصّصة ← رفع قالب جديد."
             : "Download the ZIP and upload it from your Zid dashboard → Custom themes → Upload new theme."}
         </p>
         <a
@@ -297,7 +297,7 @@ function UiActionCard({ ui, isAr }: { ui: UiPayload; isAr: boolean }) {
           className="inline-flex items-center h-10 px-4 rounded-full bg-ink text-paper text-sm font-medium hover:bg-ink/85"
           download
         >
-          {isAr ? "تحميل ZIP" : "Download ZIP"}
+          {isAr ? "تحميل الملف" : "Download ZIP"}
         </a>
       </div>
     );

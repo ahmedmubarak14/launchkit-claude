@@ -33,7 +33,7 @@ export async function loginAction(_prev: AuthState, formData: FormData): Promise
   const locale = resolveLocale(String(formData.get("locale") || defaultLocale));
 
   if (!parsed.success) {
-    return { error: locale === "ar" ? "تحقّق من البريد وكلمة المرور." : "Check your email and password." };
+    return { error: locale === "ar" ? "تأكّد من البريد الإلكتروني وكلمة المرور." : "Check your email and password." };
   }
 
   const supabase = await createClient();
@@ -43,7 +43,7 @@ export async function loginAction(_prev: AuthState, formData: FormData): Promise
   });
 
   if (error) {
-    return { error: locale === "ar" ? "بيانات الدخول غير صحيحة." : "Incorrect email or password." };
+    return { error: locale === "ar" ? "البريد الإلكتروني أو كلمة المرور غير صحيحة." : "Incorrect email or password." };
   }
 
   redirect(`/${locale}/dashboard`);
@@ -61,11 +61,11 @@ export async function signupAction(_prev: AuthState, formData: FormData): Promis
   if (!parsed.success) {
     const issues = parsed.error.issues[0]?.path[0];
     const map: Record<string, { en: string; ar: string }> = {
-      email: { en: "Enter a valid email address.", ar: "أدخل بريداً إلكترونياً صحيحاً." },
-      password: { en: "Password needs at least 8 characters.", ar: "كلمة المرور يجب أن تكون ٨ أحرف على الأقل." },
-      name: { en: "Enter your full name.", ar: "أدخل اسمك الكامل." },
+      email: { en: "Enter a valid email address.", ar: "يُرجى إدخال بريد إلكتروني صحيح." },
+      password: { en: "Password needs at least 8 characters.", ar: "يجب ألّا تقلّ كلمة المرور عن ثمانية أحرف." },
+      name: { en: "Enter your full name.", ar: "يُرجى إدخال اسمك الكامل." },
     };
-    const fallback = { en: "Something looks off. Check the form.", ar: "تحقّق من النموذج." };
+    const fallback = { en: "Something looks off. Check the form.", ar: "يوجد خطأ ما. راجع الحقول من فضلك." };
     const msg = map[String(issues ?? "")] ?? fallback;
     return { error: locale === "ar" ? msg.ar : msg.en };
   }
@@ -80,7 +80,7 @@ export async function signupAction(_prev: AuthState, formData: FormData): Promis
   });
 
   if (error) {
-    return { error: locale === "ar" ? "تعذّر إنشاء الحساب." : "Couldn't create the account." };
+    return { error: locale === "ar" ? "تعذّر إنشاء الحساب. يُرجى المحاولة مرّة أخرى." : "Couldn't create the account." };
   }
 
   if (data.user) {

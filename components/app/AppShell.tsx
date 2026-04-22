@@ -27,8 +27,8 @@ export function AppShell({
   const nav: NavItem[] = [
     { href: "/dashboard", label: t("dashboard.greeting", { name: "" }).replace(",", "").trim() || "Dashboard", icon: LayoutDashboard },
     { href: "/dashboard/products", label: t("products.title"), icon: Package },
-    { href: "/setup", label: isAr ? "مساحة العمل" : "Workspace", icon: Sparkles },
-    { href: "/connect", label: isAr ? "الاتصال بـ زد" : "Zid connection", icon: Store },
+    { href: "/setup", label: isAr ? "المحادثة" : "Workspace", icon: Sparkles },
+    { href: "/connect", label: isAr ? "ربط زد" : "Zid connection", icon: Store },
     { href: "/settings", label: isAr ? "الإعدادات" : "Settings", icon: Settings },
   ];
 
@@ -76,7 +76,7 @@ export function AppShell({
               </span>
             </div>
             <div className="mt-1.5 text-sm font-medium text-ink truncate">
-              {storeName ?? (isAr ? "غير مرتبط" : "Not connected")}
+              {storeName ?? (isAr ? "غير مربوط" : "Not connected")}
             </div>
           </div>
         </div>

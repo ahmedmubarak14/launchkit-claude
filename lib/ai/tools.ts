@@ -162,7 +162,7 @@ const ClarifyInput = z.object({
 
 async function requireSession(ctx: ToolContext): Promise<ZidSession> {
   const s = await getZidSession(ctx.userId);
-  if (!s) throw new Error(ctx.locale === "ar" ? "المتجر غير مرتبط بـ زد." : "Zid store not connected.");
+  if (!s) throw new Error(ctx.locale === "ar" ? "لم يُربط متجر زد بعد." : "Zid store not connected.");
   return s;
 }
 
