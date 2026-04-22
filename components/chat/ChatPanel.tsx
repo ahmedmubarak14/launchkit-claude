@@ -1,24 +1,43 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useMutation } from "@tanstack/react-query";
-import { Send, Loader2, Sparkles, Check, AlertCircle, Paperclip } from "lucide-react";
+import { Send, Loader2, Sparkles, Check, AlertCircle, Paperclip, Upload, X } from "lucide-react";
 import { VoiceButton } from "./VoiceButton";
 import { parseProductsFromCSV, parseProductsFromXLSXRows } from "@/lib/csv-parser";
-import type { UiPayload } from "@/lib/ai/tools";
+import type { UiPayload, BulkProductPreview } from "@/lib/ai/tools";
+
+type ToolEvent = { name: string; ok: boolean; summary: string };
+
+type LocalBulkUploadPayload = {
+  kind: "local_bulk_upload";
+  products: BulkProductPreview[];
+  fileName: string;
+};
+
+type AnyUiPayload = UiPayload | LocalBulkUploadPayload;
 
 type ChatMessage =
   | { id: string; role: "user"; content: string }
-  | { id: string; role: "assistant"; content: string; uiActions?: UiPayload[]; toolEvents?: ToolEvent[] };
-
-type ToolEvent = { name: string; ok: boolean; summary: string };
+  | { id: string; role: "assistant"; content: string; uiActions?: AnyUiPayload[]; toolEvents?: ToolEvent[] };
 
 type ChatResponse = {
   message: string;
   uiActions: UiPayload[];
   toolEvents: ToolEvent[];
 };
+
+const SESSION_STORAGE_KEY = "launchkit.chat.sessionId.v1";
+
+function getOrCreateSessionId(): string {
+  if (typeof window === "undefined") return "";
+  const existing = window.localStorage.getItem(SESSION_STORAGE_KEY);
+  if (existing) return existing;
+  const fresh = crypto.randomUUID();
+  window.localStorage.setItem(SESSION_STORAGE_KEY, fresh);
+  return fresh;
+}
 
 async function sendMessage(args: {
   sessionId: string;
@@ -35,25 +54,47 @@ async function sendMessage(args: {
   return res.json();
 }
 
+async function fetchHistory(sessionId: string): Promise<ChatMessage[]> {
+  const res = await fetch(`/api/chat/history?sessionId=${encodeURIComponent(sessionId)}`, { cache: "no-store" });
+  if (!res.ok) return [];
+  const data = (await res.json()) as { messages?: ChatMessage[] };
+  return data.messages ?? [];
+}
+
 export function ChatPanel() {
   const t = useTranslations("chat");
   const locale = useLocale() as "ar" | "en";
   const isAr = locale === "ar";
 
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
+  const introMessage: ChatMessage = useMemo(
+    () => ({
       id: "sys-intro",
       role: "assistant",
       content: isAr
         ? "أهلاً بك. أنا لانش كِت. اكتب أو تحدّث، وسأنفّذ ما تطلبه في متجرك مباشرةً."
         : "Hi, I'm LaunchKit. Type or talk — I act on your live store directly.",
-    },
-  ]);
+    }),
+    [isAr]
+  );
+
+  const [messages, setMessages] = useState<ChatMessage[]>([introMessage]);
   const [input, setInput] = useState("");
   const [uploading, setUploading] = useState(false);
-  const sessionIdRef = useRef(crypto.randomUUID());
+  const [hydrated, setHydrated] = useState(false);
+  const [sessionId, setSessionId] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Hydrate sessionId from localStorage + past messages from Supabase on mount.
+  useEffect(() => {
+    const id = getOrCreateSessionId();
+    setSessionId(id);
+
+    fetchHistory(id).then((past) => {
+      if (past.length > 0) setMessages([introMessage, ...past]);
+      setHydrated(true);
+    });
+  }, [introMessage]);
 
   const historyForApi = useMemo(
     () =>
@@ -63,14 +104,15 @@ export function ChatPanel() {
     [messages]
   );
 
+  const scrollToBottom = useCallback(() => {
+    queueMicrotask(() =>
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" })
+    );
+  }, []);
+
   const mutation = useMutation({
     mutationFn: (text: string) =>
-      sendMessage({
-        sessionId: sessionIdRef.current,
-        locale,
-        message: text,
-        history: historyForApi,
-      }),
+      sendMessage({ sessionId, locale, message: text, history: historyForApi }),
     onSuccess: (data) => {
       setMessages((prev) => [
         ...prev,
@@ -82,7 +124,7 @@ export function ChatPanel() {
           toolEvents: data.toolEvents,
         },
       ]);
-      queueMicrotask(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }));
+      scrollToBottom();
     },
     onError: () => {
       setMessages((prev) => [
@@ -104,11 +146,17 @@ export function ChatPanel() {
     mutation.mutate(trimmed);
   };
 
+  // Replace a specific message in-place (used by the bulk-upload card after
+  // a publish succeeds or fails).
+  const replaceMessage = (id: string, next: ChatMessage) => {
+    setMessages((prev) => prev.map((m) => (m.id === id ? next : m)));
+  };
+
   const onFilePicked = async (file: File) => {
     setUploading(true);
     try {
       const ext = file.name.toLowerCase().split(".").pop();
-      let products: { nameAr: string; nameEn: string; price: number; imageUrl?: string; categoryName?: string }[] = [];
+      let products: BulkProductPreview[] = [];
 
       if (ext === "csv") {
         products = parseProductsFromCSV(await file.text());
@@ -136,15 +184,23 @@ export function ChatPanel() {
         return;
       }
 
-      const lines = products
-        .slice(0, 20)
-        .map((p) => `- ${p.nameEn} / ${p.nameAr} — ${p.price} SAR${p.categoryName ? ` [${p.categoryName}]` : ""}${p.imageUrl ? ` 🖼️` : ""}`)
-        .join("\n");
-      const message = isAr
-        ? `رفعتُ ملف ${file.name} يحتوي على ${products.length} منتج. من فضلك اعرضها للمعاينة حتّى أراجعها قبل النشر.\n\n${lines}${products.length > 20 ? `\n…وبقيّة ${products.length - 20} منتج` : ""}`
-        : `I uploaded ${file.name} with ${products.length} products. Show them as a preview so I can review before publishing.\n\n${lines}${products.length > 20 ? `\n…and ${products.length - 20} more` : ""}`;
-
-      submit(message);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "user",
+          content: isAr ? `رفعتُ ملف ${file.name}` : `Uploaded ${file.name}`,
+        },
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: isAr
+            ? `قرأتُ ${products.length} منتج من الملف. راجع القائمة أدناه ثم اضغط النشر.`
+            : `I parsed ${products.length} products. Review the list below and hit publish.`,
+          uiActions: [{ kind: "local_bulk_upload", products, fileName: file.name }],
+        },
+      ]);
+      scrollToBottom();
     } catch (err) {
       setMessages((prev) => [
         ...prev,
@@ -163,8 +219,19 @@ export function ChatPanel() {
   return (
     <div className="max-w-3xl mx-auto h-[calc(100vh-4rem)] flex flex-col">
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-8 space-y-6">
+        {!hydrated && (
+          <div className="flex items-center gap-2 text-muted-ink text-xs">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            {isAr ? "جارٍ استرجاع المحادثة…" : "Restoring conversation…"}
+          </div>
+        )}
         {messages.map((m) => (
-          <Bubble key={m.id} message={m} isAr={isAr} />
+          <Bubble
+            key={m.id}
+            message={m}
+            isAr={isAr}
+            onReplace={(next) => replaceMessage(m.id, next)}
+          />
         ))}
         {mutation.isPending && (
           <div className="flex items-center gap-2 text-muted-ink text-sm">
@@ -231,7 +298,15 @@ export function ChatPanel() {
   );
 }
 
-function Bubble({ message, isAr }: { message: ChatMessage; isAr: boolean }) {
+function Bubble({
+  message,
+  isAr,
+  onReplace,
+}: {
+  message: ChatMessage;
+  isAr: boolean;
+  onReplace: (next: ChatMessage) => void;
+}) {
   if (message.role === "user") {
     return (
       <div className="flex justify-end">
@@ -257,7 +332,12 @@ function Bubble({ message, isAr }: { message: ChatMessage; isAr: boolean }) {
           <ToolEventPill key={i} event={ev} isAr={isAr} />
         ))}
         {message.uiActions?.map((ui, i) => (
-          <UiActionCard key={i} ui={ui} isAr={isAr} />
+          <UiActionCard
+            key={i}
+            ui={ui}
+            isAr={isAr}
+            onConfirmResult={(confirmedMessage) => onReplace(confirmedMessage)}
+          />
         ))}
       </div>
     </div>
@@ -280,7 +360,15 @@ function ToolEventPill({ event, isAr }: { event: ToolEvent; isAr: boolean }) {
   );
 }
 
-function UiActionCard({ ui, isAr }: { ui: UiPayload; isAr: boolean }) {
+function UiActionCard({
+  ui,
+  isAr,
+  onConfirmResult,
+}: {
+  ui: AnyUiPayload;
+  isAr: boolean;
+  onConfirmResult: (msg: ChatMessage) => void;
+}) {
   if (ui.kind === "install_theme_instructions") {
     return (
       <div className="rounded-2xl border hairline bg-cream/60 p-5">
@@ -301,6 +389,10 @@ function UiActionCard({ ui, isAr }: { ui: UiPayload; isAr: boolean }) {
         </a>
       </div>
     );
+  }
+
+  if (ui.kind === "local_bulk_upload") {
+    return <LocalBulkUploadCard ui={ui} isAr={isAr} onConfirmResult={onConfirmResult} />;
   }
 
   if (ui.kind === "preview_bulk_products") {
@@ -388,4 +480,121 @@ function UiActionCard({ ui, isAr }: { ui: UiPayload; isAr: boolean }) {
   }
 
   return null;
+}
+
+function LocalBulkUploadCard({
+  ui,
+  isAr,
+  onConfirmResult,
+}: {
+  ui: LocalBulkUploadPayload;
+  isAr: boolean;
+  onConfirmResult: (msg: ChatMessage) => void;
+}) {
+  const [publishing, setPublishing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const publish = async () => {
+    setPublishing(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/store/products/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ products: ui.products }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || `HTTP ${res.status}`);
+        return;
+      }
+
+      const content = isAr
+        ? `نُشر ${data.created} من أصل ${data.total} منتج${data.failed > 0 ? `. فشل ${data.failed}.` : " بنجاح."}`
+        : `Published ${data.created} of ${data.total} products${data.failed > 0 ? `. ${data.failed} failed.` : "."}`;
+
+      onConfirmResult({
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content,
+        toolEvents: [
+          {
+            name: "bulk_products_publish",
+            ok: data.failed === 0,
+            summary: `${data.created}/${data.total}`,
+          },
+        ],
+      });
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const dismiss = () => {
+    onConfirmResult({
+      id: crypto.randomUUID(),
+      role: "assistant",
+      content: isAr ? "تمّ إلغاء الرفع." : "Upload cancelled.",
+    });
+  };
+
+  return (
+    <div className="rounded-2xl border hairline bg-paper p-5 space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-xs tracking-[0.18em] uppercase text-muted-ink">
+            {isAr ? `${ui.products.length} منتج جاهز للنشر` : `${ui.products.length} products ready`}
+          </div>
+          <div className="text-sm font-medium mt-1 text-ink">{ui.fileName}</div>
+        </div>
+        <button
+          onClick={dismiss}
+          disabled={publishing}
+          className="w-7 h-7 rounded-full border hairline flex items-center justify-center text-muted-ink hover:text-ink hover:bg-cream transition-colors disabled:opacity-50"
+          title={isAr ? "إلغاء" : "Dismiss"}
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      <ul className="divide-y hairline max-h-64 overflow-y-auto">
+        {ui.products.slice(0, 10).map((p, i) => (
+          <li key={i} className="py-2 flex items-center gap-3 text-sm">
+            <div className="flex-1 min-w-0">
+              <div className="truncate text-ink">{isAr ? p.nameAr : p.nameEn}</div>
+              {p.categoryName && (
+                <div className="text-xs text-muted-ink truncate">{p.categoryName}</div>
+              )}
+            </div>
+            <div className="tabular-nums text-muted-ink text-xs">{p.price.toLocaleString()} SAR</div>
+          </li>
+        ))}
+        {ui.products.length > 10 && (
+          <li className="py-2 text-xs text-muted-ink">
+            {isAr ? `و ${ui.products.length - 10} منتج إضافي…` : `and ${ui.products.length - 10} more…`}
+          </li>
+        )}
+      </ul>
+
+      {error && (
+        <p className="text-sm text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-xl">{error}</p>
+      )}
+
+      <button
+        onClick={publish}
+        disabled={publishing}
+        className="w-full h-11 rounded-full bg-ink text-paper text-sm font-medium inline-flex items-center justify-center gap-2 hover:bg-ink/85 transition-colors disabled:opacity-60"
+      >
+        {publishing ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <Upload className="w-4 h-4" />
+        )}
+        {isAr ? `نشر ${ui.products.length} منتج في زد` : `Publish ${ui.products.length} products to Zid`}
+      </button>
+    </div>
+  );
 }
