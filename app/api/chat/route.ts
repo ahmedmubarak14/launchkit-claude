@@ -125,8 +125,33 @@ export async function POST(request: NextRequest) {
     messages.push({ role: "user", content: toolResults });
   }
 
-  // Best-effort persistence
+  // Best-effort persistence. messages FK -> setup_sessions.id, which
+  // FK -> stores.id, so we upsert the session row before the message
+  // insert or the FK will silently reject.
   try {
+    const { data: storeRow } = await supabase
+      .from("stores")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("platform", "zid")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (storeRow?.id) {
+      await supabase
+        .from("setup_sessions")
+        .upsert(
+          {
+            id: sessionId,
+            store_id: storeRow.id,
+            status: "in_progress",
+            current_step: "products",
+          },
+          { onConflict: "id" }
+        );
+    }
+
     await supabase.from("messages").insert([
       { session_id: sessionId, role: "user", content: message },
       {
