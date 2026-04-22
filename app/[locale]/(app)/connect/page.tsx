@@ -1,15 +1,19 @@
 import { setRequestLocale } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
-import { Store, ArrowRight, Check } from "lucide-react";
+import { Store, ArrowRight, Check, Info } from "lucide-react";
 
 export default async function ConnectPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ next?: string }>;
 }) {
   const { locale } = await params;
+  const { next } = await searchParams;
   setRequestLocale(locale);
   const isAr = locale === "ar";
+  const bouncedFromSetup = next === "/setup";
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -37,6 +41,17 @@ export default async function ConnectPage({
           ? "خطوة واحدة. بعدها يصبح لانش كيت زميلاً داخل متجرك، يقرأ كتالوجك ويدير كل عملية نيابة عنك."
           : "One click. LaunchKit becomes a teammate inside your store — reading your catalogue and running every operation on your behalf."}
       </p>
+
+      {bouncedFromSetup && !connected && (
+        <div className="mt-8 flex items-start gap-3 rounded-2xl border border-champagne/40 bg-champagne/10 px-4 py-3 text-sm">
+          <Info className="w-4 h-4 text-champagne mt-0.5 flex-shrink-0" />
+          <p className="text-ink leading-relaxed">
+            {isAr
+              ? "مساحة العمل تحتاج متجر زد مربوطاً. اربطه الآن وسنعيدك مباشرة بعد ذلك."
+              : "The workspace needs a connected Zid store. Link it now and we'll drop you back in."}
+          </p>
+        </div>
+      )}
 
       <div className="mt-10 rounded-3xl border hairline bg-paper p-8 flex items-center gap-6">
         <div className="w-14 h-14 rounded-2xl bg-cream border hairline flex items-center justify-center">
