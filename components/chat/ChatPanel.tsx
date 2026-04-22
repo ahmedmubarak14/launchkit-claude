@@ -3,8 +3,9 @@
 import { useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useMutation } from "@tanstack/react-query";
-import { Send, Loader2, Sparkles, Check, AlertCircle } from "lucide-react";
+import { Send, Loader2, Sparkles, Check, AlertCircle, Paperclip } from "lucide-react";
 import { VoiceButton } from "./VoiceButton";
+import { parseProductsFromCSV, parseProductsFromXLSXRows } from "@/lib/csv-parser";
 import type { UiPayload } from "@/lib/ai/tools";
 
 type ChatMessage =
@@ -49,8 +50,10 @@ export function ChatPanel() {
     },
   ]);
   const [input, setInput] = useState("");
+  const [uploading, setUploading] = useState(false);
   const sessionIdRef = useRef(crypto.randomUUID());
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const historyForApi = useMemo(
     () =>
@@ -101,6 +104,62 @@ export function ChatPanel() {
     mutation.mutate(trimmed);
   };
 
+  const onFilePicked = async (file: File) => {
+    setUploading(true);
+    try {
+      const ext = file.name.toLowerCase().split(".").pop();
+      let products: { nameAr: string; nameEn: string; price: number; imageUrl?: string; categoryName?: string }[] = [];
+
+      if (ext === "csv") {
+        products = parseProductsFromCSV(await file.text());
+      } else if (ext === "xlsx" || ext === "xls") {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch("/api/store/parse-file", { method: "POST", body: fd });
+        const data = await res.json();
+        products = parseProductsFromXLSXRows(data.rows || []);
+      } else {
+        throw new Error(isAr ? "صيغة غير مدعومة" : "Unsupported format");
+      }
+
+      if (products.length === 0) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: isAr
+              ? "الملف لا يحتوي على منتجات قابلة للقراءة. تأكّد من وجود أعمدة name_ar / name_en / price."
+              : "Couldn't read any products from that file. Make sure it has name_ar / name_en / price columns.",
+          },
+        ]);
+        return;
+      }
+
+      const lines = products
+        .slice(0, 20)
+        .map((p) => `- ${p.nameEn} / ${p.nameAr} — ${p.price} SAR${p.categoryName ? ` [${p.categoryName}]` : ""}${p.imageUrl ? ` 🖼️` : ""}`)
+        .join("\n");
+      const message = isAr
+        ? `رفعت ملف ${file.name} يحتوي على ${products.length} منتج. أعرضها كمعاينة لأراجعها ثم أنشرها.\n\n${lines}${products.length > 20 ? `\n…و ${products.length - 20} منتج إضافي` : ""}`
+        : `I uploaded ${file.name} with ${products.length} products. Show them as a preview so I can review before publishing.\n\n${lines}${products.length > 20 ? `\n…and ${products.length - 20} more` : ""}`;
+
+      submit(message);
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: isAr ? `تعذّرت قراءة الملف: ${String(err)}` : `Couldn't read the file: ${String(err)}`,
+        },
+      ]);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   return (
     <div className="max-w-3xl mx-auto h-[calc(100vh-4rem)] flex flex-col">
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-8 space-y-6">
@@ -123,6 +182,25 @@ export function ChatPanel() {
         className="border-t hairline bg-paper px-4 py-4"
       >
         <div className="flex items-end gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onFilePicked(f);
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading || mutation.isPending}
+            title={t("uploadCsv")}
+            className="w-11 h-11 rounded-2xl border hairline bg-paper text-ink flex items-center justify-center hover:bg-cream transition-colors disabled:opacity-50"
+          >
+            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+          </button>
           <VoiceButton onTranscript={(txt) => submit(txt)} />
           <div className="flex-1 relative">
             <textarea
