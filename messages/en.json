@@ -1,0 +1,169 @@
+{
+  "meta": {
+    "appName": "LaunchKit",
+    "tagline": "The commerce operator for Zid."
+  },
+  "nav": {
+    "product": "Product",
+    "pricing": "Pricing",
+    "customers": "Customers",
+    "docs": "Docs",
+    "login": "Sign in",
+    "getStarted": "Start free",
+    "switchToArabic": "العربية"
+  },
+  "landing": {
+    "eyebrow": "Built in Riyadh for Zid merchants",
+    "heroTitle": "Your store, done in an afternoon.",
+    "heroLead": "LaunchKit is a workspace for Zid merchants. Talk or type — in English or Arabic — and watch products, categories, themes, and landing pages ship to your live store.",
+    "primaryCta": "Open the workspace",
+    "secondaryCta": "Watch a 90-second tour",
+    "heroNote": "Connects to Zid in one click. No card. Arabic-first.",
+    "proofLabel": "Trusted by merchants on Zid",
+    "featuresEyebrow": "What lives inside",
+    "featuresTitle": "Five workflows. One operator.",
+    "features": {
+      "catalog": {
+        "title": "Bulk catalog, without the spreadsheet rage",
+        "body": "Drag a CSV or XLSX, confirm matches, hit publish. Images, categories, bilingual copy — all in one pass."
+      },
+      "voice": {
+        "title": "Voice-native, because typing is slow",
+        "body": "Hold the mic, say it in Arabic. LaunchKit hears you, writes the product, shows the preview before anything ships."
+      },
+      "theme": {
+        "title": "A theme that looks intentional on day one",
+        "body": "LaunchKit's silver-minimal theme installs straight into your Zid storefront. Built on the Vitrin engine, RTL-first, editable anywhere."
+      },
+      "landing": {
+        "title": "Landing pages that don't scream template",
+        "body": "Describe the vibe, get a homepage with hero, promo, testimonials. Ships to your live Zid store via App Scripts."
+      },
+      "delete": {
+        "title": "Delete, bulk-delete, undo — from the same window",
+        "body": "Direct product management, not just creation. Type it, click it, or let the AI clean house."
+      }
+    },
+    "stepsTitle": "From empty store to open for business in about an afternoon.",
+    "steps": [
+      { "num": "01", "title": "Connect Zid", "body": "OAuth in one click. LaunchKit becomes a teammate inside your store." },
+      { "num": "02", "title": "Pour in your catalog", "body": "CSV, XLSX, or a short conversation. Bilingual copy generated alongside the data you already have." },
+      { "num": "03", "title": "Dress the storefront", "body": "Install the LaunchKit theme, pick a palette, drop in a landing page." },
+      { "num": "04", "title": "Keep shipping", "body": "Edit anything by asking. Delete in bulk. Swap copy per campaign." }
+    ],
+    "testimonialsEyebrow": "From the pilot",
+    "testimonial": {
+      "quote": "I set up a full silver-accessories store while my coffee was still warm. Arabic hero, fifty products, theme, landing — all of it.",
+      "author": "Layla A.",
+      "role": "Founder, Fiddah"
+    },
+    "faqTitle": "Questions merchants ask first",
+    "faq": [
+      {
+        "q": "Do I need to move my store off Zid?",
+        "a": "No. LaunchKit sits on top of Zid through the official partner API. Your orders, payments, and checkout stay where they are."
+      },
+      {
+        "q": "Is Arabic actually first-class, or is it a Google Translate layer?",
+        "a": "First-class. The copy model writes Arabic natively, the theme is RTL-first, and the voice input understands Gulf Arabic dialects."
+      },
+      {
+        "q": "What about products I already have?",
+        "a": "LaunchKit reads your live catalog at every turn. It edits and deletes what exists before it ever suggests creating new."
+      },
+      {
+        "q": "How much does it cost?",
+        "a": "Free while we're in private pilot. Pricing lands before general availability, under the monthly cost of one junior designer."
+      }
+    ],
+    "finalTitle": "Stop assembling your store. Start running it.",
+    "finalBody": "Ten minutes to connect. An afternoon to go live.",
+    "finalCta": "Claim my early-access seat",
+    "footer": {
+      "product": "Product",
+      "company": "Company",
+      "legal": "Legal",
+      "about": "About",
+      "contact": "Contact",
+      "privacy": "Privacy",
+      "terms": "Terms",
+      "status": "Status",
+      "changelog": "Changelog",
+      "copyright": "LaunchKit — built in Riyadh. All rights reserved."
+    }
+  },
+  "auth": {
+    "loginTitle": "Welcome back",
+    "loginSubtitle": "Pick up where you left off.",
+    "signupTitle": "Create your LaunchKit account",
+    "signupSubtitle": "Three fields. No card.",
+    "email": "Email",
+    "password": "Password",
+    "name": "Full name",
+    "submitLogin": "Sign in",
+    "submitSignup": "Create account",
+    "switchToSignup": "New here? Create an account.",
+    "switchToLogin": "Already have an account? Sign in.",
+    "errorGeneric": "Something went wrong. Try again."
+  },
+  "dashboard": {
+    "greeting": "Hello, {name}",
+    "subtitle": "Here's what's live in your store right now.",
+    "stats": {
+      "store": "Connected store",
+      "categories": "Categories",
+      "products": "Products",
+      "complete": "Setup"
+    },
+    "emptyStore": "No Zid store connected yet.",
+    "connectCta": "Connect your Zid store",
+    "continueCta": "Open the workspace",
+    "sections": {
+      "recent": "Recent products",
+      "categories": "Categories",
+      "viewAll": "View all"
+    }
+  },
+  "products": {
+    "title": "Products",
+    "subtitle": "Live from your Zid store.",
+    "refresh": "Refresh",
+    "search": "Search by name",
+    "selectAll": "Select all",
+    "deleteSelected": "Delete {count} selected",
+    "empty": "No products in this store yet.",
+    "loading": "Loading your catalog…",
+    "deleteConfirm": "Delete {count, plural, one {# product} other {# products}}?",
+    "deleteWarning": "This permanently removes the product(s) from your Zid store.",
+    "deleteCta": "Yes, delete",
+    "cancel": "Cancel",
+    "deleted": "Deleted",
+    "deleteFailed": "Couldn't delete {name}",
+    "status": {
+      "active": "Active",
+      "draft": "Draft",
+      "hidden": "Hidden"
+    }
+  },
+  "chat": {
+    "placeholder": "Ask LaunchKit anything about your store…",
+    "send": "Send",
+    "voiceStart": "Hold to speak",
+    "voiceStop": "Release to send",
+    "voiceUnsupported": "Voice isn't supported in this browser. Try Chrome or Safari.",
+    "listening": "Listening…",
+    "uploadCsv": "Upload products CSV/XLSX",
+    "newConversation": "New conversation",
+    "thinking": "LaunchKit is thinking…"
+  },
+  "common": {
+    "back": "Back",
+    "next": "Next",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "loading": "Loading…",
+    "error": "Error"
+  }
+}
