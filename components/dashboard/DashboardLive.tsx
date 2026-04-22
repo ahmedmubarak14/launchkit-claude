@@ -57,9 +57,14 @@ export function DashboardLive({ userName }: { userName: string }) {
     },
   ];
 
-  const lastUpdated = dataUpdatedAt
-    ? formatDistanceToNow(dataUpdatedAt, { addSuffix: true, locale: isAr ? arLocale : enUS })
-    : null;
+  const lastUpdated = (() => {
+    if (!dataUpdatedAt) return null;
+    try {
+      return formatDistanceToNow(dataUpdatedAt, { addSuffix: true, locale: isAr ? arLocale : enUS });
+    } catch {
+      return null;
+    }
+  })();
 
   return (
     <>
