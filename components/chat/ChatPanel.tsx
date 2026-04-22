@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Send, Loader2, Sparkles, Check, AlertCircle, Paperclip, Upload, X } from "lucide-react";
 import { VoiceButton } from "./VoiceButton";
 import { parseProductsFromCSV, parseProductsFromXLSXRows } from "@/lib/csv-parser";
@@ -494,6 +494,7 @@ function LocalBulkUploadCard({
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const qc = useQueryClient();
 
   const publish = async () => {
     setPublishing(true);
@@ -503,6 +504,9 @@ function LocalBulkUploadCard({
     const total = ui.products.length;
     let totalCreated = 0;
     let totalFailed = 0;
+    let totalLinked = 0;
+    let totalRequestedLinks = 0;
+    const unmatchedSet = new Set<string>();
     const firstErrorDetail: string[] = [];
 
     setProgress({ done: 0, total });
@@ -526,6 +530,9 @@ function LocalBulkUploadCard({
         } else {
           totalCreated += Number(data.created ?? 0);
           totalFailed += Number(data.failed ?? 0);
+          totalLinked += Number(data.categoriesLinked ?? 0);
+          totalRequestedLinks += Number(data.categoriesRequested ?? 0);
+          for (const name of data.unmatchedCategories ?? []) unmatchedSet.add(String(name));
         }
 
         setProgress({ done: Math.min(i + BATCH_SIZE, total), total });
@@ -536,9 +543,24 @@ function LocalBulkUploadCard({
         return;
       }
 
+      // Refresh the dashboard + products page so they show the new inventory
+      qc.invalidateQueries({ queryKey: ["zid-products"] });
+      qc.invalidateQueries({ queryKey: ["store-stats"] });
+
+      const linkNote = totalRequestedLinks > 0
+        ? (isAr
+            ? ` · رُبط ${totalLinked}/${totalRequestedLinks} بالفئات`
+            : ` · ${totalLinked}/${totalRequestedLinks} linked to categories`)
+        : "";
+      const unmatchedNote = unmatchedSet.size > 0
+        ? (isAr
+            ? ` · فئات غير موجودة: ${Array.from(unmatchedSet).slice(0, 3).join("، ")}`
+            : ` · unknown categories: ${Array.from(unmatchedSet).slice(0, 3).join(", ")}`)
+        : "";
+
       const content = isAr
-        ? `نُشر ${totalCreated} من أصل ${total} منتج${totalFailed > 0 ? `. فشل ${totalFailed}.` : " بنجاح."}`
-        : `Published ${totalCreated} of ${total} products${totalFailed > 0 ? `. ${totalFailed} failed.` : "."}`;
+        ? `نُشر ${totalCreated} من أصل ${total} منتج${totalFailed > 0 ? `. فشل ${totalFailed}` : ""}${linkNote}${unmatchedNote}.`
+        : `Published ${totalCreated} of ${total} products${totalFailed > 0 ? `. ${totalFailed} failed` : ""}${linkNote}${unmatchedNote}.`;
 
       onConfirmResult({
         id: crypto.randomUUID(),

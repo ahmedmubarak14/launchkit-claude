@@ -1,13 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getZidSession, zidFetch } from "@/lib/zid/client";
+import { extractList, extractTotal } from "@/lib/zid/parse";
 
 /**
  * GET /api/store/products/zid
  * Fetches the live product list from the merchant's Zid store.
- * Returns { products: ZidProduct[], total: number, storeConnected: boolean }
- * Pass ?debug=1 to also get a small slice of the raw Zid response for
- * diagnosing shape mismatches.
  */
 export interface ZidProduct {
   id: string;
@@ -31,7 +29,8 @@ export async function GET(request: NextRequest) {
     }
 
     const res = await zidFetch(session, `/v1/products/?page=1&per_page=100`);
-    console.log("[products/zid] status:", res.status, "body preview:", res.text.slice(0, 400));
+    console.log("[products/zid] status:", res.status);
+    console.log("[products/zid] body preview:", res.text.slice(0, 600));
 
     if (!res.ok) {
       return NextResponse.json({
@@ -43,68 +42,39 @@ export async function GET(request: NextRequest) {
     }
 
     const data = res.json as Record<string, unknown> | null;
-
-    // Zid's response shape varies by endpoint version. Try every known wrapper:
-    const rawList = extractProductList(data);
+    const rawList = extractList(data, "products");
     const totalCount = extractTotal(data, rawList.length);
 
     const products: ZidProduct[] = rawList.map(normaliseProduct);
-
     const debug = request.nextUrl.searchParams.get("debug") === "1";
+
+    if (rawList.length === 0 && totalCount > 0) {
+      // Zid reports a total but we didn't find the array — log the full shape
+      console.warn("[products/zid] total>0 but no array found. keys:", data ? Object.keys(data) : null);
+    }
 
     return NextResponse.json({
       products,
       total: totalCount,
       storeConnected: true,
-      ...(debug && {
-        debug: {
-          rawKeys: data ? Object.keys(data) : [],
-          firstRawItem: rawList[0] ?? null,
-          bodyPreview: res.text.slice(0, 800),
-        },
-      }),
+      ...(debug || (rawList.length === 0 && totalCount > 0)
+        ? {
+            debug: {
+              rawKeys: data ? Object.keys(data) : [],
+              nestedKeys: data && typeof data === "object"
+                ? Object.fromEntries(
+                    Object.entries(data).map(([k, v]) => [k, typeof v === "object" && v ? Object.keys(v) : typeof v])
+                  )
+                : null,
+              bodyPreview: res.text.slice(0, 1200),
+            },
+          }
+        : {}),
     });
   } catch (err) {
     console.error("[products/zid] fetch error:", err);
     return NextResponse.json({ products: [], total: 0, error: String(err) });
   }
-}
-
-function extractProductList(data: Record<string, unknown> | null): Record<string, unknown>[] {
-  if (!data) return [];
-  const candidates: unknown[] = [
-    data.products,
-    (data.data as Record<string, unknown> | undefined)?.products,
-    (data.payload as Record<string, unknown> | undefined)?.products,
-    ((data.payload as Record<string, unknown> | undefined)?.data as Record<string, unknown> | undefined)?.products,
-    data.results,
-    (data.data as Record<string, unknown> | undefined)?.results,
-    data.items,
-    (data.data as Record<string, unknown> | undefined)?.items,
-    data.data,
-    data.payload,
-  ];
-  for (const c of candidates) {
-    if (Array.isArray(c)) return c as Record<string, unknown>[];
-  }
-  return [];
-}
-
-function extractTotal(data: Record<string, unknown> | null, fallback: number): number {
-  if (!data) return fallback;
-  const candidates: unknown[] = [
-    data.total,
-    data.total_count,
-    data.total_results,
-    (data.meta as Record<string, unknown> | undefined)?.total,
-    (data.pagination as Record<string, unknown> | undefined)?.total,
-    (data.payload as Record<string, unknown> | undefined)?.total_count,
-    (data.payload as Record<string, unknown> | undefined)?.total,
-  ];
-  for (const c of candidates) {
-    if (typeof c === "number" && Number.isFinite(c)) return c;
-  }
-  return fallback;
 }
 
 function normaliseProduct(p: Record<string, unknown>): ZidProduct {

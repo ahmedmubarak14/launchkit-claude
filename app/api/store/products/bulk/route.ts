@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getZidSession, zidFetch } from "@/lib/zid/client";
+import { extractList } from "@/lib/zid/parse";
 
 const ProductInputSchema = z.object({
   nameAr: z.string().min(1).optional(),
@@ -21,21 +22,15 @@ const ProductInputSchema = z.object({
   { message: "At least one of nameAr or nameEn is required" }
 );
 
-// Server cap is generous; the client batches into groups of BATCH_SIZE so
-// even a 2,000-product CSV works without timing out a single request.
 const BulkSchema = z.object({
   products: z.array(ProductInputSchema).min(1).max(500),
 });
-
-type CategoryRow = { id?: string | number; name?: { ar?: string; en?: string } | string };
 
 /**
  * POST /api/store/products/bulk
  *
  * Bulk-create products on the merchant's Zid store. Used by the chat's
- * CSV/XLSX upload flow. Runs sequentially (Zid doesn't have a batch
- * endpoint); returns per-product results so the client can surface
- * partial failures.
+ * CSV/XLSX upload flow.
  */
 export async function POST(request: NextRequest) {
   const parsed = BulkSchema.safeParse(await request.json());
@@ -54,26 +49,31 @@ export async function POST(request: NextRequest) {
 
   // Pre-fetch categories once so we can resolve categoryName → categoryId
   const catRes = await zidFetch(session, `/v1/managers/store/categories/`);
-  const catData = catRes.json as { categories?: CategoryRow[]; data?: { categories?: CategoryRow[] } } | null;
-  const rawCats: CategoryRow[] = catData?.categories ?? catData?.data?.categories ?? [];
+  const rawCats = extractList(catRes.json as Record<string, unknown> | null, "categories");
+
   const categoryIndex = new Map<string, string>();
   for (const c of rawCats) {
     if (!c.id) continue;
-    const name = c.name;
-    const ar = typeof name === "object" ? name?.ar ?? "" : String(name ?? "");
-    const en = typeof name === "object" ? name?.en ?? "" : "";
-    if (ar) categoryIndex.set(ar.toLowerCase(), String(c.id));
-    if (en) categoryIndex.set(en.toLowerCase(), String(c.id));
+    const name = c.name as Record<string, string> | string | undefined;
+    const ar = typeof name === "object" && name ? (name.ar ?? "") : String(name ?? "");
+    const en = typeof name === "object" && name ? (name.en ?? "") : "";
+    const id = String(c.id);
+    if (ar) categoryIndex.set(normalizeForMatch(ar), id);
+    if (en) categoryIndex.set(normalizeForMatch(en), id);
   }
+  console.log("[bulk] categories indexed:", categoryIndex.size, "from", rawCats.length, "rows");
 
-  const created: { zidId: string; name: string }[] = [];
+  const created: { zidId: string; name: string; categoryLinked: boolean; imageAttached: boolean }[] = [];
   const failed: { name: string; reason: string }[] = [];
+  const unmatchedCategories = new Set<string>();
 
   for (const p of parsed.data.products) {
-    // Fall back each way: if only one language is provided, mirror it.
     const nameAr = p.nameAr || p.nameEn || "";
     const nameEn = p.nameEn || p.nameAr || "";
-    const resolvedCategoryId = p.categoryId || (p.categoryName ? categoryIndex.get(p.categoryName.toLowerCase()) : undefined);
+
+    const matchKey = p.categoryName ? normalizeForMatch(p.categoryName) : "";
+    const resolvedCategoryId = p.categoryId || (matchKey ? categoryIndex.get(matchKey) : undefined);
+    if (p.categoryName && !resolvedCategoryId) unmatchedCategories.add(p.categoryName);
 
     const body = {
       name: { ar: nameAr, en: nameEn },
@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
       quantity: 999,
       requires_shipping: false,
       is_taxable: false,
+      ...(resolvedCategoryId ? { categories: [{ id: resolvedCategoryId }] } : {}),
     };
 
     const res = await zidFetch(session, `/v1/products/`, {
@@ -95,37 +96,91 @@ export async function POST(request: NextRequest) {
     });
 
     if (!res.ok) {
-      failed.push({ name: nameEn, reason: `Zid HTTP ${res.status}: ${res.text.slice(0, 120)}` });
+      failed.push({ name: nameEn, reason: `Zid HTTP ${res.status}: ${res.text.slice(0, 160)}` });
       continue;
     }
 
-    const created_json = res.json as { id?: string | number; product?: { id?: string | number } } | null;
-    const zidId = String(created_json?.id ?? created_json?.product?.id ?? "");
-    created.push({ zidId, name: nameEn });
+    const created_json = res.json as Record<string, unknown> | null;
+    const zidId = extractCreatedId(created_json);
 
-    // Attach category if resolved
+    // If the inline `categories` field didn't take, fall back to the
+    // separate POST /v1/products/{id}/categories/ endpoint
+    let categoryLinked = !!resolvedCategoryId;
     if (zidId && resolvedCategoryId) {
-      await zidFetch(session, `/v1/products/${zidId}/categories/`, {
+      const attachRes = await zidFetch(session, `/v1/products/${zidId}/categories/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: resolvedCategoryId }),
       });
+      if (!attachRes.ok) {
+        console.warn("[bulk] category attach failed for", zidId, attachRes.status, attachRes.text.slice(0, 120));
+        categoryLinked = false;
+      }
     }
 
-    // Attach image by URL if provided
+    let imageAttached = false;
     if (zidId && p.imageUrl) {
-      await zidFetch(session, `/v1/products/${zidId}/images/`, {
+      const imgRes = await zidFetch(session, `/v1/products/${zidId}/images/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: p.imageUrl }),
       });
+      imageAttached = imgRes.ok;
+      if (!imgRes.ok) {
+        console.warn("[bulk] image attach failed for", zidId, imgRes.status, imgRes.text.slice(0, 120));
+      }
     }
+
+    created.push({ zidId, name: nameEn, categoryLinked, imageAttached });
   }
+
+  const linkedCount = created.filter((c) => c.categoryLinked).length;
+  const categoryRequested = parsed.data.products.filter((p) => p.categoryName || p.categoryId).length;
 
   return NextResponse.json({
     created: created.length,
     failed: failed.length,
     total: parsed.data.products.length,
+    categoriesLinked: linkedCount,
+    categoriesRequested: categoryRequested,
+    unmatchedCategories: Array.from(unmatchedCategories),
     failures: failed,
+    availableCategories: Array.from(categoryIndex.keys()).slice(0, 30),
   });
+}
+
+function extractCreatedId(data: Record<string, unknown> | null): string {
+  if (!data) return "";
+  const candidates: unknown[] = [
+    data.id,
+    (data.product as Record<string, unknown> | undefined)?.id,
+    (data.data as Record<string, unknown> | undefined)?.id,
+    ((data.data as Record<string, unknown> | undefined)?.product as Record<string, unknown> | undefined)?.id,
+    (data.payload as Record<string, unknown> | undefined)?.id,
+  ];
+  for (const c of candidates) {
+    if (c !== undefined && c !== null) return String(c);
+  }
+  return "";
+}
+
+/**
+ * Match category names tolerantly:
+ *  - lowercased
+ *  - Arabic diacritics stripped (fatḥa/kasra/ḍamma)
+ *  - alef variants normalised (أ إ آ → ا)
+ *  - teh marbuta → heh
+ *  - yeh variants normalised
+ *  - internal whitespace collapsed
+ */
+function normalizeForMatch(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[ً-ْ]/g, "")       // diacritics
+    .replace(/[آأإ]/g, "ا") // alefs -> bare alef
+    .replace(/ة/g, "ه")           // ة -> ه
+    .replace(/[يى]/g, "ي")   // ي/ى -> ي
+    .replace(/\s+/g, " ")
+    .trim();
 }

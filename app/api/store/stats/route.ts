@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getZidSession, zidFetch } from "@/lib/zid/client";
+import { extractList, extractTotal } from "@/lib/zid/parse";
 
 /**
  * GET /api/store/stats
@@ -81,37 +82,3 @@ export async function GET() {
   });
 }
 
-function extractList(data: Record<string, unknown> | null, key: string): Record<string, unknown>[] {
-  if (!data) return [];
-  const candidates: unknown[] = [
-    data[key],
-    (data.data as Record<string, unknown> | undefined)?.[key],
-    (data.payload as Record<string, unknown> | undefined)?.[key],
-    ((data.payload as Record<string, unknown> | undefined)?.data as Record<string, unknown> | undefined)?.[key],
-    data.results,
-    data.items,
-    data.data,
-    data.payload,
-  ];
-  for (const c of candidates) {
-    if (Array.isArray(c)) return c as Record<string, unknown>[];
-  }
-  return [];
-}
-
-function extractTotal(data: Record<string, unknown> | null, fallback: number): number {
-  if (!data) return fallback;
-  const candidates: unknown[] = [
-    data.total,
-    data.total_count,
-    data.total_results,
-    (data.meta as Record<string, unknown> | undefined)?.total,
-    (data.pagination as Record<string, unknown> | undefined)?.total,
-    (data.payload as Record<string, unknown> | undefined)?.total_count,
-    (data.payload as Record<string, unknown> | undefined)?.total,
-  ];
-  for (const c of candidates) {
-    if (typeof c === "number" && Number.isFinite(c)) return c;
-  }
-  return fallback;
-}
