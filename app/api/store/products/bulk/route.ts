@@ -21,8 +21,10 @@ const ProductInputSchema = z.object({
   { message: "At least one of nameAr or nameEn is required" }
 );
 
+// Server cap is generous; the client batches into groups of BATCH_SIZE so
+// even a 2,000-product CSV works without timing out a single request.
 const BulkSchema = z.object({
-  products: z.array(ProductInputSchema).min(1).max(100),
+  products: z.array(ProductInputSchema).min(1).max(500),
 });
 
 type CategoryRow = { id?: string | number; name?: { ar?: string; en?: string } | string };

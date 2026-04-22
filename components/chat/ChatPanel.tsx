@@ -493,29 +493,52 @@ function LocalBulkUploadCard({
 }) {
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 
   const publish = async () => {
     setPublishing(true);
     setError(null);
-    try {
-      const res = await fetch("/api/store/products/bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ products: ui.products }),
-      });
-      const data = await res.json();
 
-      if (!res.ok) {
-        const issueDetail = Array.isArray(data.issues) && data.issues.length > 0
-          ? ` · ${data.issues.map((i: { path?: (string | number)[]; message?: string }) => `${(i.path ?? []).join(".")}: ${i.message ?? "invalid"}`).join("; ")}`
-          : "";
-        setError(`${data.error || `HTTP ${res.status}`}${issueDetail}`);
+    const BATCH_SIZE = 50;
+    const total = ui.products.length;
+    let totalCreated = 0;
+    let totalFailed = 0;
+    const firstErrorDetail: string[] = [];
+
+    setProgress({ done: 0, total });
+
+    try {
+      for (let i = 0; i < total; i += BATCH_SIZE) {
+        const slice = ui.products.slice(i, i + BATCH_SIZE);
+        const res = await fetch("/api/store/products/bulk", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ products: slice }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          const issueDetail = Array.isArray(data.issues) && data.issues.length > 0
+            ? ` · ${data.issues.map((x: { path?: (string | number)[]; message?: string }) => `${(x.path ?? []).join(".")}: ${x.message ?? "invalid"}`).slice(0, 3).join("; ")}`
+            : "";
+          firstErrorDetail.push(`${data.error || `HTTP ${res.status}`}${issueDetail}`);
+          totalFailed += slice.length;
+        } else {
+          totalCreated += Number(data.created ?? 0);
+          totalFailed += Number(data.failed ?? 0);
+        }
+
+        setProgress({ done: Math.min(i + BATCH_SIZE, total), total });
+      }
+
+      if (totalCreated === 0 && firstErrorDetail.length > 0) {
+        setError(firstErrorDetail[0]);
         return;
       }
 
       const content = isAr
-        ? `نُشر ${data.created} من أصل ${data.total} منتج${data.failed > 0 ? `. فشل ${data.failed}.` : " بنجاح."}`
-        : `Published ${data.created} of ${data.total} products${data.failed > 0 ? `. ${data.failed} failed.` : "."}`;
+        ? `نُشر ${totalCreated} من أصل ${total} منتج${totalFailed > 0 ? `. فشل ${totalFailed}.` : " بنجاح."}`
+        : `Published ${totalCreated} of ${total} products${totalFailed > 0 ? `. ${totalFailed} failed.` : "."}`;
 
       onConfirmResult({
         id: crypto.randomUUID(),
@@ -524,8 +547,8 @@ function LocalBulkUploadCard({
         toolEvents: [
           {
             name: "bulk_products_publish",
-            ok: data.failed === 0,
-            summary: `${data.created}/${data.total}`,
+            ok: totalFailed === 0,
+            summary: `${totalCreated}/${total}`,
           },
         ],
       });
@@ -533,6 +556,7 @@ function LocalBulkUploadCard({
       setError(String(err));
     } finally {
       setPublishing(false);
+      setProgress(null);
     }
   };
 
@@ -583,7 +607,21 @@ function LocalBulkUploadCard({
       </ul>
 
       {error && (
-        <p className="text-sm text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-xl">{error}</p>
+        <p className="text-sm text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-xl break-words">{error}</p>
+      )}
+
+      {progress && (
+        <div className="space-y-1.5">
+          <div className="h-1.5 rounded-full bg-cream overflow-hidden">
+            <div
+              className="h-full bg-ink transition-all"
+              style={{ width: `${Math.round((progress.done / progress.total) * 100)}%` }}
+            />
+          </div>
+          <div className="text-xs text-muted-ink tabular-nums text-center">
+            {progress.done} / {progress.total}
+          </div>
+        </div>
       )}
 
       <button
@@ -596,7 +634,9 @@ function LocalBulkUploadCard({
         ) : (
           <Upload className="w-4 h-4" />
         )}
-        {isAr ? `نشر ${ui.products.length} منتج في زد` : `Publish ${ui.products.length} products to Zid`}
+        {publishing
+          ? (isAr ? "جارٍ النشر…" : "Publishing…")
+          : (isAr ? `نشر ${ui.products.length} منتج في زد` : `Publish ${ui.products.length} products to Zid`)}
       </button>
     </div>
   );
