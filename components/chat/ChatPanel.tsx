@@ -340,5 +340,52 @@ function UiActionCard({ ui, isAr }: { ui: UiPayload; isAr: boolean }) {
     );
   }
 
+  if (ui.kind === "landing_page_applied") {
+    return (
+      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+        <div className="text-xs tracking-[0.18em] uppercase text-emerald-700 mb-1">
+          {isAr ? "الصفحة الرئيسية منشورة" : "Landing page live"}
+        </div>
+        <p className="text-sm text-emerald-900 leading-relaxed">
+          {isAr
+            ? "تم حقن الصفحة الرئيسية في متجر زد مباشرة."
+            : "Injected into your Zid storefront."}
+        </p>
+        {ui.storeUrl && (
+          <a
+            href={ui.storeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 inline-flex items-center h-9 px-4 rounded-full bg-ink text-paper text-xs font-medium hover:bg-ink/85"
+          >
+            {isAr ? "افتح المتجر" : "Open store"}
+          </a>
+        )}
+      </div>
+    );
+  }
+
+  if (ui.kind === "logo_preview") {
+    return (
+      <div className="rounded-2xl border hairline bg-paper p-5">
+        <div className="text-xs tracking-[0.18em] uppercase text-muted-ink mb-3">
+          {isAr ? "معاينة الشعار" : "Logo preview"}
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="w-20 h-20 rounded-2xl bg-cream border hairline flex items-center justify-center overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={ui.logoUrl} alt={ui.storeName} className="w-full h-full object-contain p-2" />
+          </div>
+          <div>
+            <div className="font-display text-lg">{ui.storeName}</div>
+            <div className="text-xs text-muted-ink mt-1">
+              {isAr ? "قل 'احفظ الشعار' للتثبيت" : "Say 'save this logo' to commit"}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return null;
 }

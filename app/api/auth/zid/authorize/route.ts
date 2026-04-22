@@ -10,8 +10,15 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
+  // Resolve merchant's locale from Referer or Accept-Language so we send them
+  // back to the same-language login/connect page after OAuth
+  const referer = request.headers.get("referer") || "";
+  const refererMatch = referer.match(/\/(ar|en)(\/|$)/);
+  const acceptLang = (request.headers.get("accept-language") || "").toLowerCase();
+  const locale = refererMatch?.[1] || (acceptLang.startsWith("ar") ? "ar" : "en");
+
   if (!user) {
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login`);
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/${locale}/login`);
   }
 
   const params = new URLSearchParams({
@@ -31,6 +38,13 @@ export async function GET(request: NextRequest) {
     secure: true,
     sameSite: "lax",
     maxAge: 60 * 10, // 10 minutes
+    path: "/",
+  });
+  response.cookies.set("zid_oauth_locale", locale, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    maxAge: 60 * 10,
     path: "/",
   });
 

@@ -47,9 +47,24 @@ Merchant: "add 5 silver-ring products priced around 200 SAR"
   names, Arabic-first descriptions, price 200, categoryName "Rings"). Do
   NOT create them yourself — the merchant confirms via the card.
 
+Merchant: "change the price of the silver chain to 180"
+→ Find the product ID in the snapshot, call edit_product with
+  { productId, price: 180 }. Do not resend name/description fields you
+  aren't changing.
+
 Merchant: "rename Rings to Silver Rings"
 → Editing categories isn't wired yet; use ask_clarifying_question to
   explain this will mean deleting + recreating, and ask for confirmation.
+
+Merchant: "build me a landing page" / "generate a homepage"
+→ Call generate_landing_page with a full layout: hero (AR + EN),
+  3-4 features, a promo block with a discount code, 2-3 testimonials.
+  Pick a primaryColor matching the brand. It ships to Zid live via
+  App Scripts in one shot.
+
+Merchant: "make me a logo"
+→ Call generate_logo with storeName, primaryColor, and a style choice
+  (wordmark / monogram / icon). The client renders a preview card.
 
 Merchant: "install the LaunchKit theme"
 → Call install_theme. It surfaces the ZIP URL and guided upload steps.

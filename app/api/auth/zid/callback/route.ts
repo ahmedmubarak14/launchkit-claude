@@ -7,14 +7,17 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get("error");
   const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
 
+  // Locale stashed during the authorize step; default to Arabic
+  const locale = (request.cookies.get("zid_oauth_locale")?.value === "en" ? "en" : "ar") as "ar" | "en";
+
   if (error || !code) {
-    return NextResponse.redirect(`${appUrl}/connect?error=${error || "no_code"}`);
+    return NextResponse.redirect(`${appUrl}/${locale}/connect?error=${error || "no_code"}`);
   }
 
   // Read user ID from the cookie we set in the authorize route
   const userId = request.cookies.get("zid_oauth_user_id")?.value;
   if (!userId) {
-    return NextResponse.redirect(`${appUrl}/login`);
+    return NextResponse.redirect(`${appUrl}/${locale}/login`);
   }
 
   try {
@@ -143,12 +146,13 @@ export async function GET(request: NextRequest) {
       store_id: storeId,
     });
 
-    const response = NextResponse.redirect(`${appUrl}/setup`);
-    // Clear the temporary cookie
+    const response = NextResponse.redirect(`${appUrl}/${locale}/setup`);
+    // Clear the temporary cookies
     response.cookies.set("zid_oauth_user_id", "", { maxAge: 0, path: "/" });
+    response.cookies.set("zid_oauth_locale", "", { maxAge: 0, path: "/" });
     return response;
   } catch (err) {
     console.error("Zid OAuth error:", err);
-    return NextResponse.redirect(`${appUrl}/connect?error=oauth_failed`);
+    return NextResponse.redirect(`${appUrl}/${locale}/connect?error=oauth_failed`);
   }
 }
